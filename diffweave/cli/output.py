@@ -104,14 +104,15 @@ def render_status(
     console.print()
 
     # 3. Pending Knowledge PRs
-    if pending_proposals:
+    proposals_list = pending_proposals if isinstance(pending_proposals, list) else (pending_proposals.get("proposals", []) if isinstance(pending_proposals, dict) else [])
+    if proposals_list:
         pr_table = Table(title="Pending Knowledge PRs (Requires Human Review)", title_justify="left", header_style="bold magenta")
         pr_table.add_column("PR ID", style="bold yellow")
         pr_table.add_column("Type", style="cyan")
         pr_table.add_column("Summary", style="white")
         pr_table.add_column("Status", style="yellow")
 
-        for p in pending_proposals[:10]:
+        for p in proposals_list[:10]:
             pr_table.add_row(
                 p.get("proposal_id", "")[:8],
                 p.get("proposal_type", "CLAIM"),
@@ -119,8 +120,8 @@ def render_status(
                 p.get("status", "PENDING"),
             )
         console.print(pr_table)
-        if len(pending_proposals) > 10:
-            console.print(f"[dim]...and {len(pending_proposals) - 10} more pending reviews. Run 'dw proposals' for full list.[/dim]")
+        if len(proposals_list) > 10:
+            console.print(f"[dim]...and {len(proposals_list) - 10} more pending reviews. Run 'dw proposals' for full list.[/dim]")
     else:
         console.print("[dim green][OK] All knowledge proposals reviewed. Knowledge register is up to date.[/dim green]")
 

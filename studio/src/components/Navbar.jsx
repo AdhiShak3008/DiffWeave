@@ -1,22 +1,30 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
-  GitPullRequest,
+  Code2,
   FileDiff,
+  GitPullRequest,
   Network,
-  Database,
   ShieldCheck,
+  UploadCloud,
+  Database,
   History,
-  FolderGit2,
-  Plus,
-  Search,
-  CheckCircle2,
   Key,
-  LogOut,
+  Star,
+  GitFork,
+  Eye,
+  Pin,
+  Search,
+  Bell,
+  Plus,
   User,
-  Zap,
+  LogOut,
+  Sparkles,
   ExternalLink,
   ChevronDown,
-  Layers
+  Layers,
+  CheckCircle2,
+  Lock,
+  Cpu
 } from 'lucide-react';
 import { api } from '../api/client';
 
@@ -28,383 +36,349 @@ export default function Navbar({
   activeTab,
   onSelectTab,
   stats,
+  currentUser,
+  onOpenAuth,
+  onLogout,
 }) {
-  const [showNewModal, setShowNewModal] = useState(false);
+  const [showWsDropdown, setShowWsDropdown] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [newWsName, setNewWsName] = useState('');
-  const [newWsDesc, setNewWsDesc] = useState('');
+  const [starred, setStarred] = useState(false);
+  const [starCount, setStarCount] = useState(142);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
 
-  // Auth Modal State
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [authMode, setAuthMode] = useState('demo');
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [customApiKey, setCustomApiKey] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
-
-  useEffect(() => {
-    setCurrentUser(api.getCurrentUser());
-  }, []);
+  const toggleStar = () => {
+    if (starred) {
+      setStarCount((c) => c - 1);
+      setStarred(false);
+    } else {
+      setStarCount((c) => c + 1);
+      setStarred(true);
+    }
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!newWsName.trim()) return;
-    await onCreateWorkspace(newWsName.trim(), newWsDesc.trim());
+    await onCreateWorkspace(newWsName.trim());
     setNewWsName('');
-    setNewWsDesc('');
-    setShowNewModal(false);
+    setShowCreateModal(false);
   };
 
-  const handleDemoLogin = async () => {
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const user = await api.demoLogin();
-      setCurrentUser(user);
-      setShowAuthModal(false);
-    } catch (err) {
-      api.setApiKey('demo-evaluator-token');
-      setCurrentUser({ username: 'Demo Evaluator', email: 'demo@docweave.io' });
-      setShowAuthModal(false);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleEmailLogin = async (e) => {
-    e.preventDefault();
-    setAuthLoading(true);
-    setAuthError('');
-    try {
-      const user = await api.login(loginEmail, loginPassword);
-      setCurrentUser(user);
-      setShowAuthModal(false);
-    } catch (err) {
-      setAuthError('Authentication failed: ' + (err.message || 'Invalid credentials'));
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleSaveApiKey = (e) => {
-    e.preventDefault();
-    if (!customApiKey.trim()) return;
-    api.setApiKey(customApiKey.trim());
-    setCurrentUser({ username: 'API Key User', email: 'pat@docweave.io' });
-    setShowAuthModal(false);
-  };
-
-  const handleLogout = () => {
-    api.logout();
-    setCurrentUser(null);
-  };
-
-  const pendingCount = stats?.pending_proposals || 0;
-
-  const navItems = [
-    { id: 'diff', label: 'Semantic Diff', icon: FileDiff },
-    { id: 'prs', label: 'Knowledge PRs', icon: GitPullRequest, badge: pendingCount > 0 ? pendingCount : null },
-    { id: 'staging', label: 'Staging & Files', icon: Layers },
-    { id: 'graph', label: 'Topology Graph', icon: Network },
-    { id: 'knowledge', label: 'Knowledge Register', icon: Database },
-    { id: 'rules', label: 'CI Policy Rules', icon: ShieldCheck },
-    { id: 'audit', label: 'Git Audit Log', icon: History },
+  const tabs = [
+    { id: 'code', label: 'Code', icon: Code2 },
+    { id: 'diff', label: 'Semantic Diff', icon: FileDiff, badge: stats?.pending_proposals ? `${stats.pending_proposals}` : '2' },
+    { id: 'prs', label: 'Pull Requests', icon: GitPullRequest, badge: stats?.pending_proposals ? `${stats.pending_proposals}` : '3' },
+    { id: 'graph', label: 'Knowledge Graph', icon: Network },
+    { id: 'rules', label: 'Policy Rules', icon: ShieldCheck, badge: '3' },
+    { id: 'staging', label: 'Ingestion', icon: UploadCloud },
+    { id: 'knowledge', label: 'Knowledge Base', icon: Database, badge: stats?.total_knowledge_items ? `${stats.total_knowledge_items}` : '18' },
+    { id: 'audit', label: 'Audit Trail', icon: History },
+    { id: 'auth', label: 'API Keys & Auth', icon: Key, badge: currentUser ? 'Active' : 'Login' },
   ];
 
   return (
-    <header className="border-b border-slate-800/80 bg-[#070A10]/95 backdrop-blur-md sticky top-0 z-50">
-      {/* Top Meta Bar */}
-      <div className="border-b border-slate-900 px-4 sm:px-6 lg:px-8 py-1.5 flex items-center justify-between text-[11px] text-slate-400 bg-[#05070C]">
+    <header className="w-full bg-[#0D1117] border-b border-[#30363D] text-slate-100 select-none">
+      {/* --------------------------------------------------------------------- */}
+      {/* TIER 1: Global GitHub Navigation Bar (#010409) */}
+      {/* --------------------------------------------------------------------- */}
+      <div className="bg-[#010409] border-b border-[#30363D] px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs">
+        {/* Left: Brand & Workspace Selector */}
         <div className="flex items-center space-x-3">
-          <span className="flex items-center space-x-1.5 font-medium text-slate-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>DiffWeave Knowledge GitOps Platform</span>
-          </span>
-          <span className="text-slate-600">|</span>
-          <span className="text-slate-400 font-mono">v0.1.0-prod</span>
-          <span className="text-slate-600">|</span>
-          <span className="text-slate-400 flex items-center space-x-1">
-            <span>Powered by DocWeave MCP</span>
-          </span>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-1.5 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
-            <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-            <span>FastMCP: 29 Tools Active</span>
-          </div>
-          <span className="text-slate-500">Latency: 14ms</span>
-        </div>
-      </div>
-
-      {/* Main Navigation Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14">
-          {/* Logo & Workspace Breadcrumbs */}
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <span className="text-white font-bold text-base">🧶</span>
-              </div>
-              <div>
-                <span className="text-base font-bold text-white tracking-tight">DiffWeave</span>
-                <span className="text-[10px] ml-1.5 px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-mono">
-                  Studio
-                </span>
+          {/* DiffWeave Logo */}
+          <div
+            onClick={() => onSelectTab('code')}
+            className="flex items-center space-x-2.5 cursor-pointer group"
+          >
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-500 p-0.5 shadow-md group-hover:scale-105 transition">
+              <div className="w-full h-full bg-[#010409] rounded-full flex items-center justify-center">
+                <Layers className="w-4 h-4 text-emerald-400" />
               </div>
             </div>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-sm text-white tracking-tight group-hover:text-emerald-400 transition">
+                DiffWeave
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono -mt-1">
+                FastMCP Platform
+              </span>
+            </div>
+          </div>
 
-            <span className="text-slate-700">/</span>
+          <span className="text-slate-600 hidden sm:inline">/</span>
 
-            {/* Workspace Selector */}
-            <div className="flex items-center space-x-2 bg-[#0E1422] border border-slate-800 rounded-lg p-1">
-              <FolderGit2 className="w-3.5 h-3.5 text-slate-400 ml-2" />
-              <select
-                className="bg-transparent text-slate-200 text-xs rounded px-2 py-1 focus:outline-none font-medium cursor-pointer"
-                value={currentWorkspace?.id || ''}
-                onChange={(e) => onSelectWorkspace(e.target.value)}
-              >
+          {/* Workspace Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowWsDropdown(!showWsDropdown)}
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-200 transition font-medium"
+            >
+              <span className="truncate max-w-[140px] text-xs">
+                {currentWorkspace?.name || 'default-workspace'}
+              </span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {showWsDropdown && (
+              <div className="absolute left-0 mt-1.5 w-64 bg-[#161B22] border border-[#30363D] rounded-lg shadow-2xl p-2 z-40 space-y-1">
+                <div className="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider">
+                  Select Workspace
+                </div>
                 {workspaces.map((w) => (
-                  <option key={w.id} value={w.id} className="bg-[#0E1422] text-slate-200">
-                    {w.name}
-                  </option>
+                  <button
+                    key={w.id}
+                    onClick={() => {
+                      onSelectWorkspace(w.id);
+                      setShowWsDropdown(false);
+                    }}
+                    className={`w-full text-left px-2 py-1.5 rounded text-xs transition flex items-center justify-between ${
+                      currentWorkspace?.id === w.id
+                        ? 'bg-emerald-500/20 text-emerald-300 font-bold'
+                        : 'text-slate-300 hover:bg-[#21262D]'
+                    }`}
+                  >
+                    <span className="truncate">{w.name}</span>
+                    {currentWorkspace?.id === w.id && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                  </button>
                 ))}
-              </select>
+                <div className="pt-1 border-t border-[#30363D]">
+                  <button
+                    onClick={() => {
+                      setShowWsDropdown(false);
+                      setShowCreateModal(true);
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded text-xs text-sky-400 hover:bg-[#21262D] font-semibold flex items-center space-x-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>New Workspace...</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
 
-              <button
-                onClick={() => setShowNewModal(true)}
-                className="text-[11px] text-slate-300 hover:text-white px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition flex items-center space-x-1"
-                title="Create Workspace"
-              >
-                <Plus className="w-3 h-3" />
-                <span>New</span>
-              </button>
-            </div>
+        {/* Center: Command Palette Global Search (GitHub Style) */}
+        <div className="hidden md:flex items-center flex-1 max-w-sm mx-6">
+          <div className="w-full relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3" />
+            <input
+              type="text"
+              readOnly
+              onClick={() => onSelectTab('knowledge')}
+              placeholder="Type / to search knowledge entities, PRs, rules..."
+              className="w-full pl-8 pr-8 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-[11px] text-slate-300 placeholder-slate-500 cursor-pointer transition focus:outline-none"
+            />
+            <span className="absolute right-2 text-[10px] font-mono text-slate-500 bg-[#0D1117] border border-[#30363D] px-1.5 py-0.5 rounded">
+              /
+            </span>
+          </div>
+        </div>
+
+        {/* Right: FastMCP Pill + User Auth Pill */}
+        <div className="flex items-center space-x-3">
+          {/* FastMCP Pill */}
+          <div className="hidden lg:flex items-center space-x-1.5 px-2.5 py-0.8 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[11px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>FastMCP: 29 Tools Active (14ms)</span>
           </div>
 
-          {/* Navigation Tabs */}
-          <nav className="flex space-x-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onSelectTab(item.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition flex items-center space-x-2 ${
-                    isActive
-                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm shadow-emerald-500/10'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
-                  <span>{item.label}</span>
-                  {item.badge && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500/20 text-amber-300 font-mono font-semibold border border-amber-500/30">
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+          {/* DocWeave Portal Link */}
+          <a
+            href="http://localhost:5173"
+            target="_blank"
+            rel="noreferrer"
+            className="hidden sm:flex items-center space-x-1 text-slate-400 hover:text-white transition px-2 py-1 rounded hover:bg-[#161B22]"
+            title="Open DocWeave Web App"
+          >
+            <span>DocWeave Portal</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
 
-          {/* User Session & Auth Action */}
-          <div className="flex items-center space-x-3">
-            {currentUser ? (
-              <div className="flex items-center space-x-2 bg-[#0E1422] border border-slate-800 px-2.5 py-1 rounded-lg text-xs">
-                <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-[10px]">
+          {/* User Profile / Auth Button */}
+          {currentUser ? (
+            <div className="relative">
+              <button
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-200 transition"
+              >
+                <div className="w-4 h-4 rounded-full bg-emerald-500 text-black font-bold flex items-center justify-center text-[9px]">
                   {currentUser.username ? currentUser.username[0].toUpperCase() : 'U'}
                 </div>
-                <span className="text-slate-200 font-medium max-w-[110px] truncate">{currentUser.username}</span>
-                <button
-                  onClick={handleLogout}
-                  className="text-slate-500 hover:text-red-400 p-0.5 rounded transition"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition shadow-sm shadow-emerald-600/30 flex items-center space-x-1.5"
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>Connect / API Key</span>
+                <span className="font-semibold text-xs truncate max-w-[100px]">
+                  {currentUser.username || 'Evaluator'}
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
-            )}
+
+              {showUserDropdown && (
+                <div className="absolute right-0 mt-1.5 w-56 bg-[#161B22] border border-[#30363D] rounded-lg shadow-2xl p-2 z-40 space-y-1 text-xs">
+                  <div className="px-2 py-1.5 border-b border-[#30363D]">
+                    <p className="font-bold text-white">{currentUser.username || 'User'}</p>
+                    <p className="text-[11px] text-slate-400 font-mono truncate">{currentUser.email || 'user@docweave.io'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowUserDropdown(false);
+                      onSelectTab('auth');
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded text-slate-300 hover:bg-[#21262D] flex items-center space-x-2"
+                  >
+                    <Key className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Personal Access Tokens</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowUserDropdown(false);
+                      onLogout();
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded text-rose-400 hover:bg-rose-500/10 flex items-center space-x-2"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Log out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={onOpenAuth}
+              className="flex items-center space-x-1.5 px-3 py-1 rounded-md bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition shadow"
+            >
+              <Lock className="w-3 h-3" />
+              <span>Sign in with DocWeave</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* --------------------------------------------------------------------- */}
+      {/* TIER 2: Repository Header & Social Counters (#0D1117) */}
+      {/* --------------------------------------------------------------------- */}
+      <div className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Repo Breadcrumb */}
+        <div className="flex items-center space-x-2 text-base sm:text-lg">
+          <Layers className="w-5 h-5 text-slate-400" />
+          <span className="text-sky-400 hover:underline cursor-pointer font-medium">
+            AdhiShak3008
+          </span>
+          <span className="text-slate-500">/</span>
+          <span className="text-white font-bold hover:underline cursor-pointer">
+            DiffWeave
+          </span>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#161B22] border border-[#30363D] text-slate-300">
+            Public
+          </span>
+        </div>
+
+        {/* GitHub Action Badges (Pin, Watch, Fork, Star) */}
+        <div className="flex items-center space-x-2 text-xs font-semibold">
+          {/* Watch */}
+          <div className="inline-flex rounded-md shadow-sm">
+            <button className="flex items-center space-x-1 px-2.5 py-1 rounded-l-md bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-slate-200 transition">
+              <Eye className="w-3.5 h-3.5 text-slate-400" />
+              <span>Watch</span>
+            </button>
+            <span className="px-2 py-1 rounded-r-md bg-[#161B22] border-y border-r border-[#30363D] text-slate-300 font-mono text-[11px]">
+              14
+            </span>
+          </div>
+
+          {/* Fork */}
+          <div className="inline-flex rounded-md shadow-sm">
+            <button className="flex items-center space-x-1 px-2.5 py-1 rounded-l-md bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-slate-200 transition">
+              <GitFork className="w-3.5 h-3.5 text-slate-400" />
+              <span>Fork</span>
+            </button>
+            <span className="px-2 py-1 rounded-r-md bg-[#161B22] border-y border-r border-[#30363D] text-slate-300 font-mono text-[11px]">
+              4
+            </span>
+          </div>
+
+          {/* Star (Interactive!) */}
+          <div className="inline-flex rounded-md shadow-sm">
+            <button
+              onClick={toggleStar}
+              className={`flex items-center space-x-1 px-2.5 py-1 rounded-l-md border border-[#30363D] transition ${
+                starred
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'bg-[#21262D] hover:bg-[#30363D] text-slate-200'
+              }`}
+            >
+              <Star className={`w-3.5 h-3.5 ${starred ? 'text-amber-400 fill-amber-400' : 'text-slate-400'}`} />
+              <span>{starred ? 'Starred' : 'Star'}</span>
+            </button>
+            <span className="px-2 py-1 rounded-r-md bg-[#161B22] border-y border-r border-[#30363D] text-slate-300 font-mono text-[11px]">
+              {starCount}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Auth / API Key Modal */}
-      {showAuthModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md">
-          <div className="bg-[#0D121F] border border-slate-700/80 p-6 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-6 h-6 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <Key className="w-3.5 h-3.5" />
-                </div>
-                <h3 className="text-base font-semibold text-white">Connect DocWeave Engine</h3>
-              </div>
-              <button onClick={() => setShowAuthModal(false)} className="text-slate-400 hover:text-white text-sm">✕</button>
-            </div>
+      {/* --------------------------------------------------------------------- */}
+      {/* TIER 3: The Iconic GitHub Sticky Underline Tabs */}
+      {/* --------------------------------------------------------------------- */}
+      <nav className="px-4 sm:px-6 flex space-x-1 overflow-x-auto text-xs font-semibold no-scrollbar">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onSelectTab(tab.id)}
+              className={`flex items-center space-x-2 px-3.5 py-2.5 border-b-2 transition whitespace-nowrap ${
+                isActive
+                  ? 'border-emerald-500 text-white font-bold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+              }`}
+            >
+              <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-500'}`} />
+              <span>{tab.label}</span>
+              {tab.badge && (
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    isActive
+                      ? 'bg-emerald-500/20 text-emerald-300 font-bold'
+                      : 'bg-[#21262D] text-slate-400'
+                  }`}
+                >
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </nav>
 
-            {/* Mode Tabs */}
-            <div className="flex border-b border-slate-800 mb-4 text-xs font-medium">
-              <button
-                onClick={() => setAuthMode('demo')}
-                className={`pb-2.5 px-3 flex items-center space-x-1.5 transition ${
-                  authMode === 'demo' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-slate-400 hover:text-slate-300'
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>1-Click Demo</span>
-              </button>
-              <button
-                onClick={() => setAuthMode('login')}
-                className={`pb-2.5 px-3 flex items-center space-x-1.5 transition ${
-                  authMode === 'login' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-slate-400 hover:text-slate-300'
-                }`}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Email Sign-In</span>
-              </button>
-              <button
-                onClick={() => setAuthMode('apikey')}
-                className={`pb-2.5 px-3 flex items-center space-x-1.5 transition ${
-                  authMode === 'apikey' ? 'border-b-2 border-emerald-400 text-emerald-400' : 'text-slate-400 hover:text-slate-300'
-                }`}
-              >
-                <Key className="w-3.5 h-3.5" />
-                <span>API Key / PAT</span>
-              </button>
-            </div>
-
-            {authError && (
-              <div className="p-2.5 mb-3 rounded-lg bg-red-950/40 border border-red-500/30 text-red-300 text-xs">
-                {authError}
-              </div>
-            )}
-
-            {authMode === 'demo' && (
+      {/* Create Workspace Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#161B22] border border-[#30363D] rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-white">Create New Knowledge Workspace</h3>
+            <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <p className="text-xs text-slate-300 mb-4 leading-relaxed">
-                  Enter immediately with the <strong className="text-white">Demo Evaluator</strong> account. Full access to diffing, PR reviews, and AI knowledge committing without registration.
-                </p>
-                <button
-                  onClick={handleDemoLogin}
-                  disabled={authLoading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-xs transition flex items-center justify-center space-x-2 shadow-lg shadow-emerald-600/20"
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>{authLoading ? 'Connecting...' : 'Launch Demo Evaluator Session'}</span>
-                </button>
-              </div>
-            )}
-
-            {authMode === 'login' && (
-              <form onSubmit={handleEmailLogin} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">DocWeave Account Email</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="evaluator@docweave.io"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition mt-2"
-                >
-                  {authLoading ? 'Signing In...' : 'Sign In with DocWeave'}
-                </button>
-              </form>
-            )}
-
-            {authMode === 'apikey' && (
-              <form onSubmit={handleSaveApiKey} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Personal Access Token (PAT) / JWT</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    value={customApiKey}
-                    onChange={(e) => setCustomApiKey(e.target.value)}
-                    className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-400 leading-normal">
-                  Connects DiffWeave Studio directly to your remote DocWeave MCP server endpoint with authenticated Bearer permissions.
-                </p>
-                <button
-                  type="submit"
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition mt-2"
-                >
-                  Save & Bind API Token
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* New Workspace Modal */}
-      {showNewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md">
-          <div className="bg-[#0D121F] border border-slate-700/80 p-6 rounded-2xl w-full max-w-md shadow-2xl">
-            <h3 className="text-base font-semibold text-white mb-4">Initialize Knowledge Workspace</h3>
-            <form onSubmit={handleCreate}>
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-slate-400 mb-1">Workspace Identifier Name</label>
+                <label className="text-xs font-semibold text-slate-300">Workspace Identifier</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Oncology Clinical Protocol 2026"
+                  placeholder="e.g. enterprise-docs-v2"
                   value={newWsName}
                   onChange={(e) => setNewWsName(e.target.value)}
-                  className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full mt-1 px-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
               </div>
-              <div className="mb-6">
-                <label className="block text-xs font-medium text-slate-400 mb-1">Description (optional)</label>
-                <textarea
-                  placeholder="Clinical documentation & knowledge validation..."
-                  value={newWsDesc}
-                  onChange={(e) => setNewWsDesc(e.target.value)}
-                  rows="3"
-                  className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                ></textarea>
-              </div>
-              <div className="flex justify-end space-x-3">
+
+              <div className="flex justify-end space-x-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowNewModal(false)}
-                  className="px-4 py-2 text-xs text-slate-400 hover:text-white transition"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-3 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-slate-300 text-xs font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition"
+                  className="px-4 py-1.5 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white text-xs font-bold"
                 >
                   Initialize Workspace
                 </button>

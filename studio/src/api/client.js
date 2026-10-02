@@ -55,6 +55,36 @@ export const api = {
     localStorage.removeItem('diffweave_user');
   },
 
+  async generateKey(name = 'CLI Personal Access Token', expiresInDays = 90) {
+    const res = await fetch(`${API_BASE}/auth/generate-key`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ name, expires_in_days: expiresInDays }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async syncCLI(token, email, username) {
+    const res = await fetch(`${API_BASE}/auth/sync-cli`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ access_token: token, email, username }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async getWhoami() {
+    try {
+      const res = await fetch(`${API_BASE}/auth/whoami`, { headers: getHeaders() });
+      if (res.ok) return await res.json();
+      return null;
+    } catch {
+      return null;
+    }
+  },
+
   getCurrentUser() {
     try {
       const u = localStorage.getItem('diffweave_user');

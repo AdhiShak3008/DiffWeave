@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api/client';
 import Navbar from './components/Navbar';
+import CodeOverview from './components/CodeOverview';
 import SemanticDiffViewer from './components/SemanticDiffViewer';
 import PRReviewDeck from './components/PRReviewDeck';
 import IngestionStaging from './components/IngestionStaging';
@@ -8,12 +9,14 @@ import KnowledgeGraph from './components/KnowledgeGraph';
 import KnowledgeBase from './components/KnowledgeBase';
 import PolicyRulesLab from './components/PolicyRulesLab';
 import AuditLog from './components/AuditLog';
+import AuthView from './components/AuthView';
 import { RefreshCw, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [workspaces, setWorkspaces] = useState([]);
   const [currentWorkspace, setCurrentWorkspace] = useState(null);
-  const [activeTab, setActiveTab] = useState('diff');
+  const [activeTab, setActiveTab] = useState('code'); // default to GitHub Code view
+  const [currentUser, setCurrentUser] = useState(null);
 
   // State data
   const [stats, setStats] = useState(null);
@@ -34,7 +37,7 @@ export default function App() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Initial load: fetch workspaces
+  // Initial load: fetch workspaces & user identity
   useEffect(() => {
     async function init() {
       try {
@@ -45,6 +48,17 @@ export default function App() {
         }
       } catch (err) {
         showToast(`Connecting to DiffWeave Bridge...`, 'info');
+      }
+
+      // Check current user
+      const localUser = api.getCurrentUser();
+      if (localUser) {
+        setCurrentUser(localUser);
+      } else {
+        const who = await api.getWhoami();
+        if (who?.authenticated && who?.user) {
+          setCurrentUser(who.user);
+        }
       }
     }
     init();
@@ -57,25 +71,31 @@ export default function App() {
     setRefreshing(true);
 
     try {
-      if (activeTab === 'diff') {
+      if (activeTab === 'diff' || activeTab === 'code') {
         const diffRes = await api.getSemanticDiff(wsId);
         setDiff(diffRes);
-      } else if (activeTab === 'prs') {
+      }
+      if (activeTab === 'prs' || activeTab === 'code') {
         const prsRes = await api.getProposals(wsId);
         setProposals(prsRes || []);
-      } else if (activeTab === 'staging') {
+      }
+      if (activeTab === 'staging') {
         const docsRes = await api.getDocuments(wsId);
         setDocuments(docsRes || []);
-      } else if (activeTab === 'graph') {
+      }
+      if (activeTab === 'graph') {
         const graphRes = await api.getKnowledgeGraph(wsId);
         setGraphData(graphRes);
-      } else if (activeTab === 'knowledge') {
+      }
+      if (activeTab === 'knowledge' || activeTab === 'code') {
         const kRes = await api.getKnowledgeItems(wsId);
         setKnowledgeItems(kRes || []);
-      } else if (activeTab === 'rules') {
+      }
+      if (activeTab === 'rules') {
         const rulesRes = await api.getRules(wsId);
         setRules(rulesRes || []);
-      } else if (activeTab === 'audit') {
+      }
+      if (activeTab === 'audit') {
         const actRes = await api.getActivityFeed(wsId);
         setActivity(actRes || []);
       }
@@ -175,9 +195,15 @@ export default function App() {
     }
   };
 
+  const handleLogout = () => {
+    api.logout();
+    setCurrentUser(null);
+    showToast('Logged out of DiffWeave.');
+  };
+
   return (
-    <div className="min-h-screen bg-[#070A10] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/20 selection:text-emerald-300">
-      {/* Top Navbar */}
+    <div className="min-h-screen bg-[#0D1117] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/20 selection:text-emerald-300">
+      {/* GitHub Multi-tier Navigation */}
       <Navbar
         workspaces={workspaces}
         currentWorkspace={currentWorkspace}
@@ -186,33 +212,23 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         stats={stats}
+        currentUser={currentUser}
+        onOpenAuth={() => setActiveTab('auth')}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Workspace Quick Action Bar */}
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <div className="flex items-center space-x-2">
-            <span className="font-semibold text-white">Active Branch:</span>
-            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20 font-bold">
-              main
-            </span>
-            <span className="text-slate-600">•</span>
-            <span className="text-slate-400 font-mono text-[11px]">
-              Workspace: {currentWorkspace?.id || '4314fb04-95be-41a2-bef4-50bf27c9c363'}
-            </span>
-          </div>
+        {/* TAB 1: Code Overview (Default GitHub Repo Home) */}
+        {activeTab === 'code' && (
+          <CodeOverview
+            currentWorkspace={currentWorkspace}
+            stats={stats}
+            onNavigateTab={setActiveTab}
+          />
+        )}
 
-          <button
-            onClick={() => refreshData()}
-            className="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-[#0E1422] hover:bg-[#141B2D] border border-slate-800 text-slate-300 hover:text-white transition"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-emerald-400' : ''}`} />
-            <span>Sync</span>
-          </button>
-        </div>
-
-        {/* Tab View Switcher */}
+        {/* TAB 2: Semantic Diff Viewer */}
         {activeTab === 'diff' && (
           <SemanticDiffViewer
             diffData={diff}
@@ -222,6 +238,7 @@ export default function App() {
           />
         )}
 
+        {/* TAB 3: Pull Requests Deck */}
         {activeTab === 'prs' && (
           <PRReviewDeck
             proposals={proposals}
@@ -231,6 +248,7 @@ export default function App() {
           />
         )}
 
+        {/* TAB 4: Ingestion Staging */}
         {activeTab === 'staging' && (
           <IngestionStaging
             documents={documents}
@@ -240,10 +258,12 @@ export default function App() {
           />
         )}
 
+        {/* TAB 5: Knowledge Graph DAG Canvas */}
         {activeTab === 'graph' && (
           <KnowledgeGraph graphData={graphData} loading={loading} />
         )}
 
+        {/* TAB 6: Knowledge Base Register */}
         {activeTab === 'knowledge' && (
           <KnowledgeBase
             knowledgeItems={knowledgeItems}
@@ -252,6 +272,7 @@ export default function App() {
           />
         )}
 
+        {/* TAB 7: Policy Rules CI Lab */}
         {activeTab === 'rules' && (
           <PolicyRulesLab
             rules={rules}
@@ -263,8 +284,21 @@ export default function App() {
           />
         )}
 
+        {/* TAB 8: Audit Timeline Log */}
         {activeTab === 'audit' && (
           <AuditLog activityFeed={activity} loading={loading} />
+        )}
+
+        {/* TAB 9: Dedicated Authentication & API Keys Page */}
+        {activeTab === 'auth' && (
+          <AuthView
+            currentUser={currentUser}
+            onAuthSuccess={(user) => {
+              setCurrentUser(user);
+              showToast(`Authenticated as ${user.username || 'Evaluator'}!`);
+            }}
+            onReturnToStudio={() => setActiveTab('code')}
+          />
         )}
       </main>
 

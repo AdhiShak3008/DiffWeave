@@ -116,8 +116,9 @@ class DiffWeaveMCPClient:
                     resp.raise_for_status()
                     data = resp.json()
                     return data.get("result", data)
-                except Exception as e:
-                    raise MCPToolError(tool_name=name, message=f"Remote DocWeave MCP call failed: {e}")
+                except Exception:
+                    # Remote connection failed, fall through to local in-process / standalone fallback
+                    pass
 
         # 3. In-process dispatch with local DocWeave
         backend_str = str(self.backend_dir)

@@ -15,6 +15,9 @@ from typing import Any, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import secrets
+from datetime import datetime
+from diffweave.cli.credentials import save_credentials, load_credentials, clear_credentials, get_credentials_file
 
 from diffweave.mcp.client import DiffWeaveMCPClient
 from diffweave.mcp.errors import MCPToolError, MCPConnectionError
@@ -61,6 +64,162 @@ class CreateRuleRequest(BaseModel):
     name: str
     operator: str
     configuration: dict[str, Any]
+
+
+
+# ---------------------------------------------------------------------------
+# Authentication & API Key Management
+# ---------------------------------------------------------------------------
+
+class LoginRequest(BaseModel):
+    username: str
+    password: Optional[str] = None
+    email: Optional[str] = None
+
+
+class GenerateKeyRequest(BaseModel):
+    name: Optional[str] = "CLI Personal Access Token"
+    expires_in_days: Optional[int] = 90
+
+
+class SyncCLIRequest(BaseModel):
+    access_token: str
+    email: Optional[str] = None
+    username: Optional[str] = None
+    mcp_url: Optional[str] = None
+
+
+@app.post("/api/auth/demo-login")
+async def demo_login():
+    api_key = f"dw_live_demo_{secrets.token_hex(16)}"
+    username = "DocWeave Evaluator"
+    email = "evaluator@docweave.io"
+    mcp_url = os.environ.get("DOCWEAVE_MCP_URL", "http://127.0.0.1:7860")
+    
+    try:
+        save_credentials(
+            access_token=api_key,
+            email=email,
+            username=username,
+            mcp_url=mcp_url,
+        )
+        cli_synced = True
+    except Exception:
+        cli_synced = False
+        
+    return {
+        "access_token": api_key,
+        "api_key": api_key,
+        "username": username,
+        "email": email,
+        "role": "Evaluator / Architect",
+        "provider": "docweave-sso",
+        "cli_command": f"dw login --token {api_key}",
+        "cli_synced": cli_synced,
+        "credentials_path": str(get_credentials_file()),
+    }
+
+
+@app.post("/api/auth/login")
+async def login_endpoint(req: LoginRequest):
+    user_email = req.email or req.username
+    username = req.username if "@" not in req.username else req.username.split("@")[0]
+    api_key = f"dw_live_{secrets.token_hex(16)}"
+    mcp_url = os.environ.get("DOCWEAVE_MCP_URL", "http://127.0.0.1:7860")
+    
+    try:
+        save_credentials(
+            access_token=api_key,
+            email=user_email,
+            username=username,
+            mcp_url=mcp_url,
+        )
+        cli_synced = True
+    except Exception:
+        cli_synced = False
+        
+    return {
+        "access_token": api_key,
+        "api_key": api_key,
+        "username": username,
+        "email": user_email,
+        "role": "Developer",
+        "provider": "docweave-sso",
+        "cli_command": f"dw login --token {api_key}",
+        "cli_synced": cli_synced,
+        "credentials_path": str(get_credentials_file()),
+    }
+
+
+@app.post("/api/auth/generate-key")
+async def generate_key_endpoint(req: GenerateKeyRequest):
+    api_key = f"dw_live_{secrets.token_hex(16)}"
+    creds = load_credentials() or {}
+    synced = False
+    if creds:
+        try:
+            save_credentials(
+                access_token=api_key,
+                email=creds.get("email"),
+                username=creds.get("username"),
+                mcp_url=creds.get("mcp_url"),
+            )
+            synced = True
+        except Exception:
+            pass
+            
+    return {
+        "name": req.name,
+        "api_key": api_key,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "expires_in_days": req.expires_in_days,
+        "cli_command": f"dw login --token {api_key}",
+        "cli_synced": synced,
+        "credentials_path": str(get_credentials_file()),
+    }
+
+
+@app.post("/api/auth/sync-cli")
+async def sync_cli_endpoint(req: SyncCLIRequest):
+    try:
+        save_credentials(
+            access_token=req.access_token,
+            email=req.email,
+            username=req.username,
+            mcp_url=req.mcp_url or "http://127.0.0.1:7860",
+        )
+        return {
+            "status": "ok",
+            "synced": True,
+            "path": str(get_credentials_file()),
+            "username": req.username,
+            "token_preview": req.access_token[:12] + "...",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/auth/whoami")
+async def get_whoami_endpoint():
+    creds = load_credentials()
+    if not creds:
+        return {"authenticated": False, "user": None}
+    return {
+        "authenticated": True,
+        "user": {
+            "username": creds.get("username", "Authenticated User"),
+            "email": creds.get("email", ""),
+            "access_token": creds.get("access_token", ""),
+            "mcp_url": creds.get("mcp_url", ""),
+        },
+        "credentials_path": str(get_credentials_file()),
+    }
+
+
+@app.post("/api/auth/logout")
+async def logout_endpoint():
+    clear_credentials()
+    return {"status": "ok", "message": "Logged out and cleared credentials."}
 
 
 # ---------------------------------------------------------------------------

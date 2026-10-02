@@ -18,7 +18,7 @@ from diffweave.cli.output import print_success, print_error, print_info, print_w
 def login_command(
     email: Optional[str] = typer.Option(None, "--email", "-e", help="DocWeave user email"),
     password: Optional[str] = typer.Option(None, "--password", "-p", help="DocWeave user password"),
-    token: Optional[str] = typer.Option(None, "--token", "-t", help="Personal Access Token or JWT"),
+    token: Optional[str] = typer.Option(None, "--token", "-t", "--api-key", "-k", help="Personal Access Token or API Key"),
     demo: bool = typer.Option(False, "--demo", help="Log in instantly using demo evaluator account"),
     url: Optional[str] = typer.Option(None, "--url", help="DocWeave Server URL (default: http://localhost:8000 or DOCWEAVE_MCP_URL)"),
 ):
