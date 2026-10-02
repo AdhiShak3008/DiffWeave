@@ -19,6 +19,21 @@ export const api = {
   // -------------------------------------------------------------------------
   // Authentication & Session
   // -------------------------------------------------------------------------
+  async signup(username, email, password) {
+    const res = await fetch(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    if (data.access_token) {
+      localStorage.setItem('diffweave_token', data.access_token);
+      localStorage.setItem('diffweave_user', JSON.stringify(data));
+    }
+    return data;
+  },
+
   async login(username, password) {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',

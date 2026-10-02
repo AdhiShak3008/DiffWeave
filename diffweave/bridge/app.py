@@ -71,6 +71,43 @@ class CreateRuleRequest(BaseModel):
 # Authentication & API Key Management
 # ---------------------------------------------------------------------------
 
+class SignupRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+
+
+@app.post("/api/auth/signup")
+async def signup_endpoint(req: SignupRequest):
+    user_email = req.email.strip().lower()
+    username = req.username.strip()
+    api_key = f"dw_live_{secrets.token_hex(16)}"
+    mcp_url = os.environ.get("DOCWEAVE_MCP_URL", "http://127.0.0.1:7860")
+    
+    try:
+        save_credentials(
+            access_token=api_key,
+            email=user_email,
+            username=username,
+            mcp_url=mcp_url,
+        )
+        cli_synced = True
+    except Exception:
+        cli_synced = False
+        
+    return {
+        "access_token": api_key,
+        "api_key": api_key,
+        "username": username,
+        "email": user_email,
+        "role": "Architect",
+        "provider": "docweave-identity",
+        "cli_command": f"dw login --api-key {api_key}",
+        "cli_synced": cli_synced,
+        "credentials_path": str(get_credentials_file()),
+    }
+
+
 class LoginRequest(BaseModel):
     username: str
     password: Optional[str] = None

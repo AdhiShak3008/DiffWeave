@@ -15,17 +15,28 @@ import {
   ArrowRight,
   Fingerprint,
   Layers,
-  Code2,
   ChevronRight,
-  Info
+  Info,
+  Server,
+  UserPlus
 } from 'lucide-react';
 import { api } from '../api/client';
 
 export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio }) {
-  const [activeTab, setActiveTab] = useState('sso'); // 'sso', 'demo', 'credentials', 'token'
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [activeTab, setActiveTab] = useState('signup'); // 'signup', 'login', 'demo', 'token'
+  
+  // Signup form
+  const [signupUsername, setSignupUsername] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+
+  // Login form
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Token form
   const [patInput, setPatInput] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -57,6 +68,50 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
     checkWhoami();
   }, [currentUser, onAuthSuccess]);
 
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    if (!signupUsername.trim() || !signupEmail.trim() || !signupPassword.trim()) {
+      setError('Please fill in all registration fields.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const data = await api.signup(signupUsername.trim(), signupEmail.trim(), signupPassword.trim());
+      onAuthSuccess(data);
+      setSuccessMsg(`Welcome, ${data.username}! Account created & API Key synced to terminal.`);
+      setSyncedCli(true);
+      if (data.credentials_path) setCliPath(data.credentials_path);
+    } catch (err) {
+      setError(err.message || 'Account creation failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setError('Please provide email and password.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const data = await api.login(loginEmail.trim(), loginPassword.trim());
+      onAuthSuccess(data);
+      setSuccessMsg(`Welcome back, ${data.username}! CLI credentials synchronized.`);
+      setSyncedCli(true);
+      if (data.credentials_path) setCliPath(data.credentials_path);
+    } catch (err) {
+      setError(err.message || 'Authentication failed. Please verify credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDemoLogin = async () => {
     setLoading(true);
     setError('');
@@ -74,27 +129,6 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
     }
   };
 
-  const handleCredentialsLogin = async (e) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setError('Please provide email and password.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      const data = await api.login(email, password);
-      onAuthSuccess(data);
-      setSuccessMsg('Authenticated via DocWeave! CLI credentials synchronized.');
-      setSyncedCli(true);
-      if (data.credentials_path) setCliPath(data.credentials_path);
-    } catch (err) {
-      setError(err.message || 'Login failed. Check DocWeave server connection.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handlePatLogin = (e) => {
     e.preventDefault();
     if (!patInput.trim()) return;
@@ -106,21 +140,6 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
     };
     onAuthSuccess(mockUser);
     setSuccessMsg('Logged in via Personal Access Token!');
-  };
-
-  const handleGenerateKey = async () => {
-    setLoading(true);
-    try {
-      const res = await api.generateKey(keyName, parseInt(expiresIn, 10));
-      setGeneratedKey(res);
-      setSuccessMsg('New Personal Access Token generated and synchronized to CLI credentials!');
-      setSyncedCli(true);
-      if (res.credentials_path) setCliPath(res.credentials_path);
-    } catch (err) {
-      setError('Failed to generate key: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleSyncToCli = async () => {
@@ -154,18 +173,17 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-8 animate-fadeIn">
-      {/* GitHub-style Hero Identity Header */}
+    <div className="max-w-3xl mx-auto py-8 px-4 space-y-8 animate-fadeIn">
+      {/* Identity Brand Header */}
       <div className="text-center space-y-3">
-        <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-sky-500/10 to-indigo-500/20 border border-emerald-500/30 shadow-xl shadow-emerald-950/20">
+        <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-teal-500/10 to-sky-500/20 border border-emerald-500/30 shadow-xl shadow-emerald-950/20">
           <Fingerprint className="w-8 h-8 text-emerald-400" />
         </div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">
-          DiffWeave Identity & FastMCP Access
+          DiffWeave Account & FastMCP Identity
         </h1>
-        <p className="text-sm text-slate-400 max-w-xl mx-auto leading-relaxed">
-          DiffWeave is the developer platform powered by DocWeave's 29-tool FastMCP Knowledge Engine.
-          Authenticate to synchronize repositories, inspect semantic pull requests, and enable terminal CLI operations.
+        <p className="text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
+          Create an account or sign in to obtain your developer API key. Credentials automatically synchronize with your local terminal CLI for document git operations.
         </p>
       </div>
 
@@ -174,15 +192,27 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
         {/* Top Tab Bar inside Card */}
         <div className="flex border-b border-[#30363D] bg-[#0D1117] text-xs font-semibold">
           <button
-            onClick={() => setActiveTab('sso')}
+            onClick={() => setActiveTab('signup')}
             className={`flex items-center space-x-2 px-5 py-3 border-b-2 transition ${
-              activeTab === 'sso'
+              activeTab === 'signup'
                 ? 'border-emerald-500 text-emerald-400 bg-[#161B22]'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#161B22]/50'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>DocWeave SSO</span>
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Create Account</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('login')}
+            className={`flex items-center space-x-2 px-5 py-3 border-b-2 transition ${
+              activeTab === 'login'
+                ? 'border-emerald-500 text-emerald-400 bg-[#161B22]'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#161B22]/50'
+            }`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Sign In</span>
           </button>
 
           <button
@@ -201,18 +231,6 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
           </button>
 
           <button
-            onClick={() => setActiveTab('credentials')}
-            className={`flex items-center space-x-2 px-5 py-3 border-b-2 transition ${
-              activeTab === 'credentials'
-                ? 'border-emerald-500 text-emerald-400 bg-[#161B22]'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-[#161B22]/50'
-            }`}
-          >
-            <Mail className="w-3.5 h-3.5" />
-            <span>Email & Password</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('token')}
             className={`flex items-center space-x-2 px-5 py-3 border-b-2 transition ${
               activeTab === 'token'
@@ -221,7 +239,7 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
             }`}
           >
             <Key className="w-3.5 h-3.5" />
-            <span>Personal Access Token</span>
+            <span>Paste API Token</span>
           </button>
         </div>
 
@@ -242,74 +260,132 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
             </div>
           )}
 
-          {/* TAB 1: DocWeave SSO */}
-          {activeTab === 'sso' && (
-            <div className="space-y-6">
-              <div className="bg-[#0D1117] border border-[#30363D] rounded-lg p-5 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                      <span>DocWeave Identity Provider</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        OAuth 2.0 / FastMCP
-                      </span>
-                    </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Authenticate with your centralized DocWeave enterprise account. An API token is automatically issued for terminal and web operations.
-                    </p>
-                  </div>
-                </div>
+          {/* TAB 1: In-App Account Signup */}
+          {activeTab === 'signup' && (
+            <form onSubmit={handleSignup} className="space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-white">Create your DocWeave Knowledge Account</h3>
+                <p className="text-xs text-slate-400">
+                  Provision an account to mint Personal Access Tokens for the CLI and Web Studio.
+                </p>
+              </div>
 
-                <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleDemoLogin}
-                    disabled={loading}
-                    className="flex-1 py-2.5 px-4 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition shadow-lg flex items-center justify-center space-x-2"
-                  >
-                    {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-                    <span>Authorize with DocWeave Identity</span>
-                  </button>
-
-                  <a
-                    href="http://localhost:5173/login"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="py-2.5 px-4 rounded-lg bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-slate-200 font-semibold text-xs transition flex items-center justify-center space-x-2"
-                  >
-                    <span>Open DocWeave Auth Page</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                  </a>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Developer Username / Full Name</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    required
+                    value={signupUsername}
+                    onChange={(e) => setSignupUsername(e.target.value)}
+                    placeholder="Adhishak"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
               </div>
 
-              {/* Need Account Footer */}
-              <div className="p-4 rounded-lg bg-sky-950/20 border border-sky-500/20 text-xs text-slate-300 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Info className="w-4 h-4 text-sky-400 shrink-0" />
-                  <span>Don't have a DocWeave account yet? Sign up on the DocWeave portal to obtain enterprise credentials.</span>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Email Address</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="email"
+                    required
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    placeholder="developer@docweave.io"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
-                <a
-                  href="http://localhost:5173/signup"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center space-x-1 text-sky-400 hover:text-sky-300 font-bold ml-2 underline shrink-0"
-                >
-                  <span>Sign up on DocWeave</span>
-                  <ArrowRight className="w-3 h-3" />
-                </a>
               </div>
-            </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Password</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="password"
+                    required
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 px-4 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition shadow-lg flex items-center justify-center space-x-2"
+              >
+                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                <span>Create Account & Mint API Key</span>
+              </button>
+            </form>
           )}
 
-          {/* TAB 2: 1-Click Demo Login */}
+          {/* TAB 2: In-App Sign In */}
+          {activeTab === 'login' && (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-white">Sign in to your DocWeave Account</h3>
+                <p className="text-xs text-slate-400">
+                  Authenticate to retrieve your active API key and synchronize your terminal environment.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Email Address</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="user@docweave.io"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300">Password</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-2.5 px-4 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition flex items-center justify-center space-x-2"
+              >
+                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                <span>Sign in & Synchronize CLI</span>
+              </button>
+            </form>
+          )}
+
+          {/* TAB 3: 1-Click Demo Login */}
           {activeTab === 'demo' && (
             <div className="space-y-4">
               <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200/90 leading-relaxed">
-                <span className="font-bold text-amber-300">Hackathon & MAANG Competition Evaluator Mode:</span>
+                <span className="font-bold text-amber-300">Competition Evaluator & Judge Mode:</span>
                 <p className="mt-1">
                   Click the button below to instantly authenticate as a DocWeave Evaluator Architect.
                   A high-entropy API key (<code className="bg-black/40 px-1 py-0.5 rounded text-amber-300">dw_live_demo_...</code>)
-                  will be minted and written directly to your local terminal configuration (<code className="bg-black/40 px-1 py-0.5 rounded text-amber-300">~/.diffweave/credentials.json</code>).
+                  is minted and written directly to your local terminal configuration (<code className="bg-black/40 px-1 py-0.5 rounded text-amber-300">~/.diffweave/credentials.json</code>).
                 </p>
               </div>
 
@@ -322,50 +398,6 @@ export default function AuthView({ currentUser, onAuthSuccess, onReturnToStudio 
                 <span>Launch 1-Click Evaluator Session</span>
               </button>
             </div>
-          )}
-
-          {/* TAB 3: Credentials Login */}
-          {activeTab === 'credentials' && (
-            <form onSubmit={handleCredentialsLogin} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">DocWeave Account Email</label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="user@docweave.io"
-                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">DocWeave Password</label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full pl-9 pr-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 px-4 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition flex items-center justify-center space-x-2"
-              >
-                {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                <span>Sign in with DocWeave Credentials</span>
-              </button>
-            </form>
           )}
 
           {/* TAB 4: Token Login */}
