@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   FileDiff,
   GitPullRequest,
@@ -41,6 +41,45 @@ export default function Navbar({
   const [newWsName, setNewWsName] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
+  const wsDropdownRef = useRef(null);
+  const userDropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  // Keyboard shortcut '/' to focus global search
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === '/' && document.activeElement !== searchInputRef.current && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        if (onSearchChange) onSearchChange('');
+        searchInputRef.current?.blur();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onSearchChange]);
+
+  // Close dropdowns when clicking anywhere outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wsDropdownRef.current && !wsDropdownRef.current.contains(event.target)) {
+        setShowWsDropdown(false);
+      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setShowUserDropdown(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!newWsName.trim()) return;
@@ -49,13 +88,17 @@ export default function Navbar({
     setShowCreateModal(false);
   };
 
+  const totalDocs = stats?.total_documents ?? 0;
+  const verifiedFacts = stats?.knowledge_items ?? stats?.total_knowledge_items ?? 0;
+  const pendingProposals = stats?.pending_proposals ?? 0;
+
   const tabs = [
-    { id: 'diff', label: 'Semantic Diff', icon: FileDiff, badge: stats?.pending_proposals ? `${stats.pending_proposals}` : '2' },
-    { id: 'prs', label: 'Knowledge PRs', icon: GitPullRequest, badge: stats?.pending_proposals ? `${stats.pending_proposals}` : '3' },
+    { id: 'diff', label: 'Semantic Diff', icon: FileDiff, badge: pendingProposals > 0 ? `${pendingProposals}` : undefined },
+    { id: 'prs', label: 'Knowledge PRs', icon: GitPullRequest, badge: pendingProposals > 0 ? `${pendingProposals}` : undefined },
     { id: 'graph', label: 'Topology Graph', icon: Network },
-    { id: 'staging', label: 'Documents & Staging', icon: Files, badge: stats?.total_documents ? `${stats.total_documents}` : '4' },
-    { id: 'rules', label: 'Policy CI Rules', icon: ShieldCheck, badge: '3' },
-    { id: 'knowledge', label: 'Master Truth Register', icon: Database, badge: stats?.total_knowledge_items ? `${stats.total_knowledge_items}` : '18' },
+    { id: 'staging', label: 'Documents & Staging', icon: Files, badge: totalDocs > 0 ? `${totalDocs}` : undefined },
+    { id: 'rules', label: 'Policy CI Rules', icon: ShieldCheck },
+    { id: 'knowledge', label: 'Master Truth Register', icon: Database, badge: verifiedFacts > 0 ? `${verifiedFacts}` : undefined },
     { id: 'audit', label: 'Audit Trail', icon: History },
     { id: 'auth', label: 'API Keys & Auth', icon: Key, badge: currentUser ? 'Active' : 'DocWeave' },
   ];
@@ -91,9 +134,12 @@ export default function Navbar({
           <span className="text-slate-600 hidden sm:inline">/</span>
 
           {/* Workspace Dropdown */}
-          <div className="relative">
+          <div ref={wsDropdownRef} className="relative">
             <button
-              onClick={() => setShowWsDropdown(!showWsDropdown)}
+              onClick={() => {
+                setShowWsDropdown((prev) => !prev);
+                setShowUserDropdown(false);
+              }}
               className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-200 transition font-medium"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -121,8 +167,13 @@ export default function Navbar({
                         : 'text-slate-300 hover:bg-[#21262D]'
                     }`}
                   >
-                    <span className="truncate">{w.name}</span>
-                    {currentWorkspace?.id === w.id && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                    <div className="flex flex-col truncate pr-2">
+                      <span className="truncate font-semibold">{w.name}</span>
+                      {w.description && (
+                        <span className="text-[10px] text-slate-400 font-normal truncate">{w.description}</span>
+                      )}
+                    </div>
+                    {currentWorkspace?.id === w.id && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                   </button>
                 ))}
                 <div className="pt-1 border-t border-[#30363D]">
@@ -192,9 +243,12 @@ export default function Navbar({
 
           {/* User Profile / Auth Button */}
           {currentUser ? (
-            <div className="relative">
+            <div ref={userDropdownRef} className="relative">
               <button
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                onClick={() => {
+                  setShowUserDropdown((prev) => !prev);
+                  setShowWsDropdown(false);
+                }}
                 className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-200 transition"
               >
                 <div className="w-4 h-4 rounded-full bg-emerald-500 text-black font-bold flex items-center justify-center text-[9px]">
@@ -237,7 +291,7 @@ export default function Navbar({
             </div>
           ) : (
             <button
-              onClick={onOpenAuth}
+              onClick={() => { window.location.href = "/login"; }}
               className="flex items-center space-x-1.5 px-3 py-1 rounded-md bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition shadow"
             >
               <Lock className="w-3 h-3" />
@@ -269,19 +323,19 @@ export default function Navbar({
           <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
             <Files className="w-3.5 h-3.5 text-sky-400" />
             <span>Tracked Docs:</span>
-            <span className="text-white font-bold font-mono">{stats?.total_documents || 4}</span>
+            <span className="text-white font-bold font-mono">{totalDocs}</span>
           </div>
 
           <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
             <Database className="w-3.5 h-3.5 text-emerald-400" />
             <span>Verified Truth:</span>
-            <span className="text-white font-bold font-mono">{stats?.total_knowledge_items || 18} Facts</span>
+            <span className="text-white font-bold font-mono">{verifiedFacts} Facts</span>
           </div>
 
           <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
             <GitPullRequest className="w-3.5 h-3.5 text-amber-400" />
             <span>Pending PRs:</span>
-            <span className="text-amber-400 font-bold font-mono">{stats?.pending_proposals || 3}</span>
+            <span className="text-amber-400 font-bold font-mono">{pendingProposals}</span>
           </div>
         </div>
       </div>

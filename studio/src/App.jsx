@@ -1,4 +1,6 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext.jsx';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api/client';
 import Navbar from './components/Navbar';
 import SemanticDiffViewer from './components/SemanticDiffViewer';
@@ -12,10 +14,14 @@ import AuthView from './components/AuthView';
 import { RefreshCw, CheckCircle2, AlertCircle, Sparkles, GitBranch } from 'lucide-react';
 
 export default function App() {
+  const { isAuthenticated, logout: authLogout, user: authUser } = useAuth();
+  const navigate = useNavigate();
+
   const [workspaces, setWorkspaces] = useState([]);
   const [currentWorkspace, setCurrentWorkspace] = useState(null);
   const [activeTab, setActiveTab] = useState('diff'); // Default to Semantic Diff Viewer!
   const [currentUser, setCurrentUser] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // State data
   const [stats, setStats] = useState(null);
@@ -49,16 +55,8 @@ export default function App() {
         showToast(`Connecting to DiffWeave FastMCP Bridge...`, 'info');
       }
 
-      // Check current user
       const localUser = api.getCurrentUser();
-      if (localUser) {
-        setCurrentUser(localUser);
-      } else {
-        const who = await api.getWhoami();
-        if (who?.authenticated && who?.user) {
-          setCurrentUser(who.user);
-        }
-      }
+      if (localUser) setCurrentUser(localUser);
     }
     init();
   }, []);
@@ -76,11 +74,11 @@ export default function App() {
       }
       if (activeTab === 'prs') {
         const prsRes = await api.getProposals(wsId);
-        setProposals(prsRes || []);
+        setProposals(Array.isArray(prsRes) ? prsRes : []);
       }
       if (activeTab === 'staging') {
         const docsRes = await api.getDocuments(wsId);
-        setDocuments(docsRes || []);
+        setDocuments(Array.isArray(docsRes) ? docsRes : []);
       }
       if (activeTab === 'graph') {
         const graphRes = await api.getKnowledgeGraph(wsId);
@@ -88,15 +86,15 @@ export default function App() {
       }
       if (activeTab === 'knowledge') {
         const kRes = await api.getKnowledgeItems(wsId);
-        setKnowledgeItems(kRes || []);
+        setKnowledgeItems(Array.isArray(kRes) ? kRes : []);
       }
       if (activeTab === 'rules') {
         const rulesRes = await api.getRules(wsId);
-        setRules(rulesRes || []);
+        setRules(Array.isArray(rulesRes) ? rulesRes : []);
       }
       if (activeTab === 'audit') {
         const actRes = await api.getActivityFeed(wsId);
-        setActivity(actRes || []);
+        setActivity(Array.isArray(actRes) ? actRes : []);
       }
 
       // Background status fetch for navbar counters
@@ -118,6 +116,14 @@ export default function App() {
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+  useEffect(() => {
+    if (authUser) {
+      setCurrentUser(authUser);
+    } else {
+      const u = api.getCurrentUser();
+      if (u) setCurrentUser(u);
+    }
+  }, [authUser]);
 
   // Actions
   const handleCreateWorkspace = async (name, desc) => {
@@ -133,7 +139,7 @@ export default function App() {
 
   const handleReview = async (proposalId, decision, comments = '') => {
     try {
-      await api.reviewProposal(proposalId, decision, comments);
+      await api.reviewProposal(currentWorkspace?.id, proposalId, decision, comments);
       showToast(`Proposal ${decision.toLowerCase()}!`);
       refreshData();
     } catch (err) {
@@ -196,14 +202,21 @@ export default function App() {
 
   const handleLogout = () => {
     api.logout();
-    setCurrentUser(null);
-    showToast('Logged out of DiffWeave.');
+    authLogout();
+    navigate('/login', { replace: true });
   };
+
+  // If user is not authenticated, strictly redirect to /login
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-[#0D1117] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/20 selection:text-emerald-300">
       {/* Platform Navigation */}
       <Navbar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
         workspaces={workspaces}
         currentWorkspace={currentWorkspace}
         onSelectWorkspace={(id) => setCurrentWorkspace(workspaces.find((w) => w.id === id))}
@@ -306,6 +319,8 @@ export default function App() {
             knowledgeItems={knowledgeItems}
             currentWorkspace={currentWorkspace}
             loading={loading}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
           />
         )}
 

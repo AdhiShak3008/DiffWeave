@@ -28,9 +28,11 @@ def save_credentials(
     email: Optional[str] = None,
     username: Optional[str] = None,
     mcp_url: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> None:
     data = {
         "access_token": access_token,
+        "api_key": api_key or access_token,
         "email": email or "",
         "username": username or "",
         "mcp_url": mcp_url or "",

@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -65,4 +65,385 @@ code, pre, .font-mono {
 }
 .pulse-glow {
   animation: pulse-dot 2s infinite ease-in-out;
+}
+
+/* ============================================================
+   DiffWeave Auth Pages (mirrors DocWeave AuthLayout.css)
+   ============================================================ */
+.dw-auth {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 460px) 1fr;
+  background: #0D1117;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #E2E8F0;
+}
+
+.dw-auth__panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 48px;
+  border-right: 1px solid #21262D;
+}
+
+.dw-auth__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 48px;
+}
+
+.dw-auth__wordmark {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #F8FAFC;
+}
+
+.dw-auth__by {
+  font-size: 11px;
+  color: #4B5563;
+  margin-left: 2px;
+  margin-top: 2px;
+}
+
+.dw-auth__card {
+  animation: dw-fade-in 0.25s ease;
+}
+
+@keyframes dw-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dw-auth__eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #10B981;
+  margin-bottom: 12px;
+}
+
+.dw-auth__title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #F8FAFC;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.dw-auth__subtitle {
+  color: #6B7280;
+  font-size: 14px;
+  margin: 0 0 32px;
+  line-height: 1.6;
+}
+
+.dw-auth__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 360px;
+}
+
+.dw-auth__footer {
+  margin-top: 32px;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.dw-auth__footer a {
+  color: #10B981;
+  text-decoration: none;
+}
+
+.dw-auth__footer a:hover {
+  text-decoration: underline;
+}
+
+/* ── Right panel ─────────────────────────────────────────── */
+.dw-auth__aside {
+  position: relative;
+  background: linear-gradient(145deg, #0d1117 0%, #0a1628 50%, #0d1117 100%);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+}
+
+.dw-auth__aside-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(16,185,129,0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16,185,129,0.12) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 40%, black 20%, transparent 70%);
+}
+
+.dw-auth__aside::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 25% 25%, rgba(16,185,129,0.2) 0%, transparent 40%),
+    radial-gradient(circle at 75% 65%, rgba(110, 86, 255, 0.15) 0%, transparent 35%),
+    radial-gradient(circle at 50% 90%, rgba(16,185,129,0.1) 0%, transparent 30%);
+  z-index: 0;
+}
+
+.dw-auth__aside-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dw-auth__tagline-line {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #F8FAFC;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  opacity: 0.8;
+}
+
+.dw-auth__tagline-line--accent {
+  color: #10B981;
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .dw-auth { grid-template-columns: 1fr; }
+  .dw-auth__aside { display: none; }
+  .dw-auth__panel { padding: 40px 24px; }
+}
+
+/* ── Form shared styles ─────────────────────────────────── */
+.dw-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 360px;
+}
+
+.dw-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dw-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #CBD5E1;
+}
+
+.dw-input {
+  width: 100%;
+  padding: 9px 13px;
+  background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 8px;
+  color: #E2E8F0;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.dw-input:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16,185,129,0.15);
+}
+
+.dw-input--otp {
+  font-size: 22px;
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-family: monospace;
+}
+
+.dw-field__error {
+  font-size: 11px;
+  color: #F87171;
+}
+
+.dw-auth-form__show-password {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6B7280;
+  cursor: pointer;
+  user-select: none;
+  margin-top: 4px;
+}
+
+.dw-auth-form__strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.dw-auth-form__strength-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #21262D;
+  overflow: hidden;
+}
+
+.dw-auth-form__strength-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.25s, background 0.25s;
+}
+
+.dw-auth-form__options {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.dw-auth-form__link {
+  font-size: 13px;
+  color: #10B981;
+  text-decoration: none;
+}
+
+.dw-auth-form__link:hover {
+  text-decoration: underline;
+}
+
+.dw-auth-form__error {
+  font-size: 13px;
+  color: #F87171;
+  padding: 10px 12px;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  border-radius: 8px;
+}
+
+.dw-auth-form__success {
+  font-size: 13px;
+  color: #6EE7B7;
+  padding: 10px 12px;
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.2);
+  border-radius: 8px;
+}
+
+.dw-auth-form__resend {
+  background: none;
+  border: none;
+  color: #10B981;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  padding: 4px 0;
+}
+
+.dw-auth-form__resend:hover { text-decoration: underline; }
+
+.dw-auth-form__footer-text {
+  font-size: 13px;
+  color: #6B7280;
+  text-align: center;
+}
+
+.dw-auth-form__footer-text a {
+  color: #10B981;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.dw-auth-form__footer-text a:hover { text-decoration: underline; }
+
+.dw-auth-divider {
+  display: flex;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.dw-auth-divider::before,
+.dw-auth-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #21262D;
+}
+
+.dw-auth-divider span {
+  padding: 0 10px;
+  font-size: 11px;
+  color: #4B5563;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.dw-btn {
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  outline: none;
+}
+
+.dw-btn--primary {
+  background: #10B981;
+  color: white;
+}
+
+.dw-btn--primary:hover:not(:disabled) {
+  background: #059669;
+  box-shadow: 0 4px 16px rgba(16,185,129,0.3);
+  transform: translateY(-1px);
+}
+
+.dw-btn--primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dw-auth-demo-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(16,185,129,0.07);
+  border: 1px solid rgba(16,185,129,0.25);
+  color: #10B981;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.dw-auth-demo-btn:hover:not(:disabled) {
+  background: rgba(16,185,129,0.15);
+  border-color: rgba(16,185,129,0.5);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(16,185,129,0.2);
+  transform: translateY(-1px);
+}
+
+.dw-auth-demo-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

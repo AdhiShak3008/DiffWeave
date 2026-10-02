@@ -50,7 +50,6 @@ class DiffWeaveMCPClient:
         if self.mcp_url:
             # Production remote cloud mode (e.g., https://your-docweave.hf.space)
             self.mode = "remote"
-            return
 
         # Local development check
         if backend_dir:
@@ -134,7 +133,56 @@ class DiffWeaveMCPClient:
 
         db = get_db()
         try:
-            user = _get_current_user(db)
+            user = None
+            ws_id = arguments.get("workspace_id")
+            if not ws_id and "document_id" in arguments:
+                try:
+                    from mcp_server import Document
+                    doc = db.query(Document).filter(Document.id == arguments["document_id"]).first()
+                    if doc:
+                        ws_id = str(doc.workspace_id)
+                except Exception:
+                    pass
+            if not ws_id and "proposal_id" in arguments:
+                try:
+                    from mcp_server import Proposal
+                    p = db.query(Proposal).filter(Proposal.id == arguments["proposal_id"]).first()
+                    if p:
+                        ws_id = str(p.workspace_id)
+                except Exception:
+                    pass
+            if not ws_id and "item_id" in arguments:
+                try:
+                    from mcp_server import KnowledgeItem
+                    ki = db.query(KnowledgeItem).filter(KnowledgeItem.id == arguments["item_id"]).first()
+                    if ki:
+                        ws_id = str(ki.workspace_id)
+                except Exception:
+                    pass
+
+            if ws_id:
+                try:
+                    from mcp_server import Workspace, User
+                    ws = db.query(Workspace).filter(Workspace.id == ws_id).first()
+                    if ws and ws.created_by:
+                        user = db.query(User).filter(User.id == ws.created_by).first()
+                except Exception:
+                    pass
+
+            if not user:
+                try:
+                    from diffweave.cli.credentials import load_credentials
+                    creds = load_credentials()
+                    if creds and creds.get("email"):
+                        from mcp_server import User
+                        u = db.query(User).filter(User.email == creds["email"]).first()
+                        if u:
+                            user = u
+                except Exception:
+                    pass
+            if not user:
+                user = _get_current_user(db)
+
             result = await _dispatch(name, arguments, db, user)
             return result
         except ValueError as e:

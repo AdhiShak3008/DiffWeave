@@ -63,10 +63,25 @@ DiffWeave is built on top of the **DocWeave** document intelligence engine via t
 
 ## Quickstart
 
-### 1. Requirements
+### 1. Requirements & Environment Configuration
 - Python 3.10+
 - Node.js 18+ (for Studio UI development)
-- DocWeave engine backend (or run in embedded standalone mode)
+- DocWeave engine backend (or run in standalone / remote cloud mode)
+
+Copy `.env.example` to `.env` to configure your environment:
+```bash
+cp .env.example .env
+```
+
+| Variable | Description | Default / Example |
+| :--- | :--- | :--- |
+| `DATABASE_URL` | Neon PostgreSQL connection string (shared with DocWeave) | `postgresql://...` |
+| `SECRET_KEY` | JWT secret for token verification (shared with DocWeave) | `b1c482a...` |
+| `DOCWEAVE_MCP_URL` | Remote DocWeave MCP server URL (for deployed cloud mode) | `https://your-docweave.hf.space` |
+| `DOCWEAVE_API_KEY` | Personal Access Token (for CI/CD or automated pipelines) | `dw_pat_...` |
+| `DOCWEAVE_BACKEND_DIR` | Path to local DocWeave backend (for in-process dev) | `../DocWeave/backend` |
+| `DIFFWEAVE_WORKSPACE_ID`| Default workspace ID to bind | `3e24fa72-b6c2-4427-9e44-b26a997fd205` |
+| `PORT` | DiffWeave Studio port | `7860` |
 
 ### 2. CLI Setup
 Run diagnostic checks to verify connectivity to DocWeave:

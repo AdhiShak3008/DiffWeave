@@ -30,8 +30,19 @@ def login_command(
 
     # 1. Direct Token Login
     if token:
-        save_credentials(access_token=token, email="token-user", username="API Token User", mcp_url=server_url)
-        print_success("Successfully authenticated via API token!")
+        email = "token-user"
+        username = "API Token User"
+        try:
+            from diffweave.bridge.docweave_auth import get_current_user_from_token
+            user_info = get_current_user_from_token(token)
+            if user_info:
+                email = user_info.get("email", email)
+                username = user_info.get("username", username)
+        except Exception:
+            pass
+
+        save_credentials(access_token=token, email=email, username=username, mcp_url=server_url)
+        print_success(f"Successfully authenticated as [bold white]{username}[/bold white] ({email})!")
         print_info(f"  Stored in: ~/.diffweave/credentials.json")
         return
 
@@ -75,24 +86,49 @@ def login_command(
     print_info(f"Authenticating [bold white]{email}[/bold white] against [cyan]{server_url}[/cyan]...")
 
     try:
-        with httpx.Client(timeout=15.0) as client:
-            resp = client.post(
-                f"{server_url}/auth/login",
-                data={"username": email, "password": password},
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                tok = data.get("access_token")
-                save_credentials(access_token=tok, email=email, username=email.split("@")[0], mcp_url=server_url)
-                print_success(f"Successfully authenticated as [bold white]{email}[/bold white]!")
-                print_info("  Session token stored in ~/.diffweave/credentials.json")
-            else:
-                print_error(f"Login failed: {resp.text}")
-                raise typer.Exit(code=1)
-    except httpx.ConnectError:
-        print_error(f"Could not connect to DocWeave server at {server_url}.")
-        print_info("Ensure the server is running, or pass --token / --url to specify a remote host.")
-        raise typer.Exit(code=1)
+        data = None
+        tok = None
+        user_info = None
+
+        # Try HTTP endpoint first
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                for endpoint in [f"{server_url}/api/auth/login", f"{server_url}/auth/login"]:
+                    try:
+                        resp = client.post(endpoint, json={"username": email, "password": password})
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            break
+                        # Try form data
+                        resp = client.post(endpoint, data={"username": email, "password": password})
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            break
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Fallback to direct DocWeave database auth if local/unreachable
+        if not data:
+            try:
+                from diffweave.bridge import docweave_auth
+                data = docweave_auth.login(email, password)
+            except Exception as e:
+                pass
+
+        if data and data.get("access_token"):
+            tok = data.get("access_token")
+            user_data = data.get("user", {})
+            uname = user_data.get("username") or email.split("@")[0]
+            save_credentials(access_token=tok, email=email, username=uname, mcp_url=server_url)
+            print_success(f"Successfully authenticated as [bold white]{uname}[/bold white] ({email})!")
+            print_info("  Session token stored in ~/.diffweave/credentials.json")
+        else:
+            print_error(f"Login failed: Invalid DocWeave email or password.")
+            raise typer.Exit(code=1)
+    except typer.Exit:
+        raise
     except Exception as e:
         print_error(f"Authentication error: {e}")
         raise typer.Exit(code=1)

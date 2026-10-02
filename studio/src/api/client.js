@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DiffWeave Studio API Client
  * Talks directly to the FastAPI bridge, which delegates to DocWeave MCP Server.
  * Supports Bearer token authentication and user sessions.
@@ -160,7 +160,7 @@ export const api = {
     const headers = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/documents/upload`, {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/upload`, {
       method: 'POST',
       headers,
       body: formData,
@@ -180,8 +180,8 @@ export const api = {
     return res.json();
   },
 
-  async reviewProposal(proposalId, decision, comments = '') {
-    const res = await fetch(`${API_BASE}/proposals/${proposalId}/review`, {
+  async reviewProposal(workspaceId, proposalId, decision, comments = '') {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/proposals/${proposalId}/review`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ decision, comments }),

@@ -22,15 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python backend dependencies
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir \
-    fastapi==0.115.0 \
-    uvicorn==0.30.6 \
-    pydantic==2.8.2 \
-    httpx==0.27.2 \
-    typer==0.12.5 \
-    rich==13.8.0 \
-    python-multipart==0.0.9
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy DiffWeave application package
 COPY diffweave ./diffweave

@@ -1,4 +1,4 @@
-"""
+﻿"""
 FastAPI Server Bridge for DiffWeave Studio.
 
 Provides secure, authenticated, workspace-scoped REST APIs that
@@ -68,231 +68,241 @@ class CreateRuleRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Authentication & API Key Management
+# Authentication -- Complete DocWeave Authentication Engine
 # ---------------------------------------------------------------------------
+import json as _json
+from fastapi import Request as _Request, Header
+from fastapi.responses import Response as _Response
+from diffweave.bridge import docweave_auth
+from diffweave.cli.credentials import save_credentials, clear_credentials
 
-class SignupRequest(BaseModel):
-    username: str
-    email: str
-    password: str
+_DOCWEAVE_URL = os.environ.get("DOCWEAVE_BACKEND_URL", "http://localhost:8000")
 
+@app.post("/api/auth/send-otp")
+async def send_otp_endpoint(request: _Request):
+    body = await request.json()
+    try:
+        res = docweave_auth.send_otp(
+            email=body.get("email", ""),
+            username=body.get("username", ""),
+            password=body.get("password", ""),
+        )
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Auth error: {str(e)}")
+
+@app.post("/api/auth/verify-otp")
+async def verify_otp_endpoint(request: _Request):
+    body = await request.json()
+    try:
+        res = docweave_auth.verify_otp(
+            email=body.get("email", ""),
+            code=body.get("code", ""),
+        )
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Verification error: {str(e)}")
 
 @app.post("/api/auth/signup")
-async def signup_endpoint(req: SignupRequest):
-    user_email = req.email.strip().lower()
-    username = req.username.strip()
-    api_key = f"dw_live_{secrets.token_hex(16)}"
-    mcp_url = os.environ.get("DOCWEAVE_MCP_URL", "http://127.0.0.1:7860")
-    
+async def signup_endpoint(request: _Request):
+    body = await request.json()
     try:
-        save_credentials(
-            access_token=api_key,
-            email=user_email,
-            username=username,
-            mcp_url=mcp_url,
+        res = docweave_auth.send_otp(
+            email=body.get("email", ""),
+            username=body.get("username", ""),
+            password=body.get("password", ""),
         )
-        cli_synced = True
-    except Exception:
-        cli_synced = False
-        
-    return {
-        "access_token": api_key,
-        "api_key": api_key,
-        "username": username,
-        "email": user_email,
-        "role": "Architect",
-        "provider": "docweave-identity",
-        "cli_command": f"dw login --api-key {api_key}",
-        "cli_synced": cli_synced,
-        "credentials_path": str(get_credentials_file()),
-    }
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: Optional[str] = None
-    email: Optional[str] = None
-
-
-class GenerateKeyRequest(BaseModel):
-    name: Optional[str] = "CLI Personal Access Token"
-    expires_in_days: Optional[int] = 90
-
-
-class SyncCLIRequest(BaseModel):
-    access_token: str
-    email: Optional[str] = None
-    username: Optional[str] = None
-    mcp_url: Optional[str] = None
-
-
-@app.post("/api/auth/demo-login")
-async def demo_login():
-    api_key = f"dw_live_demo_{secrets.token_hex(16)}"
-    username = "DocWeave Evaluator"
-    email = "evaluator@docweave.io"
-    mcp_url = os.environ.get("DOCWEAVE_MCP_URL", "http://127.0.0.1:7860")
-    
-    try:
-        save_credentials(
-            access_token=api_key,
-            email=email,
-            username=username,
-            mcp_url=mcp_url,
-        )
-        cli_synced = True
-    except Exception:
-        cli_synced = False
-        
-    return {
-        "access_token": api_key,
-        "api_key": api_key,
-        "username": username,
-        "email": email,
-        "role": "Evaluator / Architect",
-        "provider": "docweave-sso",
-        "cli_command": f"dw login --token {api_key}",
-        "cli_synced": cli_synced,
-        "credentials_path": str(get_credentials_file()),
-    }
-
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/auth/login")
-async def login_endpoint(req: LoginRequest):
-    user_email = req.email or req.username
-    username = req.username if "@" not in req.username else req.username.split("@")[0]
-    api_key = f"dw_live_{secrets.token_hex(16)}"
-    mcp_url = os.environ.get("DOCWEAVE_MCP_URL", "http://127.0.0.1:7860")
-    
-    try:
-        save_credentials(
-            access_token=api_key,
-            email=user_email,
-            username=username,
-            mcp_url=mcp_url,
-        )
-        cli_synced = True
-    except Exception:
-        cli_synced = False
-        
-    return {
-        "access_token": api_key,
-        "api_key": api_key,
-        "username": username,
-        "email": user_email,
-        "role": "Developer",
-        "provider": "docweave-sso",
-        "cli_command": f"dw login --token {api_key}",
-        "cli_synced": cli_synced,
-        "credentials_path": str(get_credentials_file()),
-    }
-
-
-@app.post("/api/auth/generate-key")
-async def generate_key_endpoint(req: GenerateKeyRequest):
-    api_key = f"dw_live_{secrets.token_hex(16)}"
-    creds = load_credentials() or {}
-    synced = False
-    if creds:
+async def login_endpoint(request: _Request):
+    """
+    DocWeave login: accepts both OAuth2 form data (username, password)
+    and JSON bodies (email/username, password).
+    """
+    content_type = request.headers.get("content-type", "")
+    username = ""
+    password = ""
+    if "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        username = form.get("username", "")
+        password = form.get("password", "")
+    else:
         try:
-            save_credentials(
-                access_token=api_key,
-                email=creds.get("email"),
-                username=creds.get("username"),
-                mcp_url=creds.get("mcp_url"),
-            )
-            synced = True
+            data = await request.json()
+            username = data.get("username") or data.get("email", "")
+            password = data.get("password", "")
         except Exception:
             pass
-            
-    return {
-        "name": req.name,
-        "api_key": api_key,
-        "created_at": datetime.utcnow().isoformat() + "Z",
-        "expires_in_days": req.expires_in_days,
-        "cli_command": f"dw login --token {api_key}",
-        "cli_synced": synced,
-        "credentials_path": str(get_credentials_file()),
-    }
 
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username/Email and password are required.")
 
-@app.post("/api/auth/sync-cli")
-async def sync_cli_endpoint(req: SyncCLIRequest):
     try:
-        save_credentials(
-            access_token=req.access_token,
-            email=req.email,
-            username=req.username,
-            mcp_url=req.mcp_url or "http://127.0.0.1:7860",
-        )
-        return {
-            "status": "ok",
-            "synced": True,
-            "path": str(get_credentials_file()),
-            "username": req.username,
-            "token_preview": req.access_token[:12] + "...",
-        }
+        result = docweave_auth.login(username, password)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
+@app.post("/api/auth/demo-login")
+async def demo_login_endpoint():
+    try:
+        return docweave_auth.demo_login()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Demo login failed: {str(e)}")
 
+@app.get("/api/auth/me")
 @app.get("/api/auth/whoami")
-async def get_whoami_endpoint():
-    creds = load_credentials()
-    if not creds:
-        return {"authenticated": False, "user": None}
-    return {
-        "authenticated": True,
-        "user": {
-            "username": creds.get("username", "Authenticated User"),
-            "email": creds.get("email", ""),
-            "access_token": creds.get("access_token", ""),
-            "mcp_url": creds.get("mcp_url", ""),
-        },
-        "credentials_path": str(get_credentials_file()),
-    }
+async def auth_me_endpoint(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authentication token required.")
+    token = authorization.split(" ", 1)[1].strip()
+    user = docweave_auth.get_current_user_from_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired token.")
+    return user
 
+@app.post("/api/auth/forgot-password")
+async def forgot_password_endpoint(request: _Request):
+    body = await request.json()
+    return docweave_auth.forgot_password(body.get("email", ""))
+
+@app.post("/api/auth/reset-password")
+async def reset_password_endpoint(request: _Request):
+    body = await request.json()
+    try:
+        return docweave_auth.reset_password(body.get("token", ""), body.get("new_password", ""))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/auth/logout")
 async def logout_endpoint():
-    clear_credentials()
-    return {"status": "ok", "message": "Logged out and cleared credentials."}
+    return docweave_auth.logout()
 
+@app.post("/api/auth/generate-key")
+async def generate_key_endpoint(request: _Request, authorization: str = Header(None)):
+    token = ""
+    email = "evaluator@docweave.io"
+    username = "DocWeave User"
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        user = docweave_auth.get_current_user_from_token(token)
+        if user:
+            email = user.get("email", email)
+            username = user.get("username", username)
+    if not token:
+        token = f"dw_pat_{uuid.uuid4().hex}"
 
-# ---------------------------------------------------------------------------
-# Health & MCP Meta
-# ---------------------------------------------------------------------------
+    try:
+        save_credentials(
+            access_token=token,
+            email=email,
+            username=username,
+            api_key=token,
+        )
+    except Exception:
+        pass
 
-@app.get("/api/health")
-async def health_check():
-    return {"status": "ok", "service": "diffweave-bridge", "mcp_connected": True}
+    return {
+        "status": "success",
+        "api_key": token,
+        "token_type": "personal_access_token",
+        "username": username,
+        "email": email,
+        "created_at": datetime.utcnow().isoformat(),
+        "instructions": "Set DIFFWEAVE_API_KEY in terminal or run 'diffweave auth login'.",
+    }
 
-
-@app.get("/api/mcp/tools")
-async def list_mcp_tools():
-    """Discover all MCP tools exposed by the underlying DocWeave server."""
-    from mcp_server import list_tools
-    tools = await list_tools()
-    return [
-        {
-            "name": t.name,
-            "description": t.description,
-            "inputSchema": t.inputSchema,
-        }
-        for t in tools
-    ]
-
+@app.post("/api/auth/sync-cli")
+async def sync_cli_endpoint(request: _Request):
+    body = await request.json()
+    token = body.get("access_token", "")
+    email = body.get("email", "evaluator@docweave.io")
+    username = body.get("username", "Evaluator")
+    try:
+        save_credentials(
+            access_token=token,
+            email=email,
+            username=username,
+            api_key=token,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "synced", "cli_config": "~/.diffweave/credentials.json"}
 
 # ---------------------------------------------------------------------------
 # Workspaces
 # ---------------------------------------------------------------------------
 
 @app.get("/api/workspaces")
-async def get_workspaces():
+async def get_workspaces(authorization: str = Header(None)):
     try:
+        from sqlalchemy import text
+        user = None
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.split(" ", 1)[1].strip()
+            user = docweave_auth.get_current_user_from_token(token)
+
+        eng = docweave_auth.get_engine()
+        with eng.connect() as conn:
+            # If user is authenticated, query their workspaces first
+            if user and user.get("id"):
+                rows = conn.execute(
+                    text("""
+                        SELECT w.id, w.name, w.description,
+                               (SELECT count(*) FROM knowledge_items WHERE workspace_id = w.id) as k_count,
+                               (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
+                        FROM workspaces w
+                        WHERE w.created_by = :uid
+                        ORDER BY k_count DESC, w.created_at DESC
+                    """),
+                    {"uid": user["id"]}
+                ).fetchall()
+                if rows:
+                    return [
+                        {
+                            "id": str(r[0]),
+                            "name": r[1],
+                            "description": r[2] or f"{r[4]} documents · {r[3]} verified facts",
+                            "k_count": r[3],
+                            "d_count": r[4]
+                        }
+                        for r in rows
+                    ]
+
+            # If evaluator/demo or no workspaces for user, return all workspaces
+            rows = conn.execute(
+                text("""
+                    SELECT w.id, w.name, w.description,
+                           (SELECT count(*) FROM knowledge_items WHERE workspace_id = w.id) as k_count,
+                           (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
+                    FROM workspaces w
+                    ORDER BY k_count DESC, w.created_at DESC
+                """)
+            ).fetchall()
+            if rows:
+                return [
+                    {
+                        "id": str(r[0]),
+                        "name": r[1],
+                        "description": r[2] or f"{r[4]} documents · {r[3]} verified facts",
+                        "k_count": r[3],
+                        "d_count": r[4]
+                    }
+                    for r in rows
+                ]
+
         return await client.list_workspaces()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return await client.list_workspaces()
 
 
 @app.post("/api/workspaces")
@@ -592,13 +602,12 @@ async def get_activity_feed_endpoint(
 
 
 # ---------------------------------------------------------------------------
-# Static Studio UI Hosting (if built)
+# Static Studio UI Hosting (SPA with catch-all routing)
 # ---------------------------------------------------------------------------
 
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok", "service": "diffweave", "platform": "huggingface-space"}
-
 
 studio_dist_candidates = [
     Path("/app/studio/dist"),
@@ -607,12 +616,29 @@ studio_dist_candidates = [
     Path(__file__).parent.parent / "studio" / "dist",
     Path("C:/Users/Adhi/Desktop/DiffWeave/studio/dist"),
 ]
-for dist_path in studio_dist_candidates:
-    if dist_path.exists() and (dist_path / "index.html").exists():
-        from fastapi.staticfiles import StaticFiles
-        app.mount("/", StaticFiles(directory=str(dist_path), html=True), name="studio_ui")
+
+dist_path = None
+for p in studio_dist_candidates:
+    if p.exists() and (p / "index.html").exists():
+        dist_path = p
         break
 
+if dist_path:
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    assets_path = dist_path / "assets"
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="studio_assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa_page(full_path: str):
+        # Allow static files if they exist in dist
+        file_p = dist_path / full_path
+        if file_p.exists() and file_p.is_file():
+            return FileResponse(file_p)
+        # Otherwise fallback to index.html for React Router (e.g. /login, /signup)
+        return FileResponse(dist_path / "index.html")
 
 if __name__ == "__main__":
     import uvicorn

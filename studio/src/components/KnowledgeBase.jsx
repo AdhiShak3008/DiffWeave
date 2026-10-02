@@ -11,10 +11,13 @@ import {
   Layers
 } from 'lucide-react';
 
-export default function KnowledgeBase({ knowledgeItems, currentWorkspace, loading }) {
-  const [search, setSearch] = useState('');
+export default function KnowledgeBase({ knowledgeItems = [], currentWorkspace, loading, searchQuery = '', onSearchChange }) {
+  const [internalSearch, setInternalSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [copiedId, setCopiedId] = useState(null);
+
+  const search = searchQuery !== undefined && searchQuery !== '' ? searchQuery : internalSearch;
+  const setSearch = onSearchChange || setInternalSearch;
 
   if (loading) {
     return (
@@ -26,13 +29,18 @@ export default function KnowledgeBase({ knowledgeItems, currentWorkspace, loadin
   }
 
   const filtered = knowledgeItems.filter((item) => {
-    const matchesCat = categoryFilter === 'ALL' || item.type === categoryFilter;
-    const matchesSearch =
-      !search ||
-      item.title.toLowerCase().includes(search.toLowerCase()) ||
-      String(item.value || '').toLowerCase().includes(search.toLowerCase());
-    return matchesCat && matchesSearch;
+    const itemType = String(item.type || '').toUpperCase();
+    const matchesCat = categoryFilter === 'ALL' || itemType === categoryFilter;
+    const s = search.toLowerCase().trim();
+    if (!s) return matchesCat;
+    const titleMatch = (item.title || '').toLowerCase().includes(s);
+    const valueMatch = String(item.value || '').toLowerCase().includes(s);
+    const typeMatch = itemType.toLowerCase().includes(s);
+    const fileMatch = (item.filename || '').toLowerCase().includes(s);
+    return matchesCat && (titleMatch || valueMatch || typeMatch || fileMatch);
   });
+
+  const availableCategories = ['ALL', ...new Set(knowledgeItems.map((i) => String(i.type || '').toUpperCase()).filter(Boolean))];
 
   const handleCopy = (val, id) => {
     navigator.clipboard.writeText(val);
@@ -116,11 +124,11 @@ export default function KnowledgeBase({ knowledgeItems, currentWorkspace, loadin
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="bg-[#141B2D] border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none"
           >
-            <option value="ALL">All Categories</option>
-            <option value="CLAIM">Claims</option>
-            <option value="METRIC">Metrics</option>
-            <option value="ENTITY">Entities</option>
-            <option value="DATE">Dates</option>
+            {availableCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat === 'ALL' ? 'All Categories' : cat}
+              </option>
+            ))}
           </select>
 
           {/* Export Button */}

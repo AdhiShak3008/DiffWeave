@@ -16,11 +16,16 @@ dependencies = [
     "httpx>=0.25.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
 ]
 
 [project.scripts]
-dw = "cli.main:app"
+dw = "diffweave.cli.main:app"
+diffweave = "diffweave.cli.main:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cli*", "mcp*", "bridge*"]
+include = ["diffweave*"]
