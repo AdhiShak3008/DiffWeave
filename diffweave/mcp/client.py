@@ -2,8 +2,10 @@
 DiffWeave MCP Client Adapter.
 
 Provides a unified, resilient interface to DocWeave's MCP services.
-Supports both stdio transport (official MCP JSON-RPC protocol) and
-in-process dispatch fallback for fast local operations.
+Supports:
+1. In-process dispatch (for high-speed local development with DocWeave).
+2. Remote HTTP/SSE transport (via DOCWEAVE_MCP_URL).
+3. Embedded standalone engine (runs independently if DocWeave is not present).
 """
 from __future__ import annotations
 
@@ -19,19 +21,28 @@ from diffweave.mcp.errors import MCPConnectionError, MCPToolError
 
 class DiffWeaveMCPClient:
     """
-    Client for interacting with the DocWeave MCP server.
+    Client for interacting with DocWeave MCP services or embedded fallback.
     """
 
-    def __init__(self, backend_dir: Optional[str] = None):
+    def __init__(self, backend_dir: Optional[str] = None, mcp_url: Optional[str] = None):
+        self.mcp_url = mcp_url or os.environ.get("DOCWEAVE_MCP_URL")
+        self.backend_dir = None
+        self._standalone_engine = None
+
+        if self.mcp_url:
+            # Remote MCP server mode
+            self.mode = "remote"
+            return
+
         if backend_dir:
-            self.backend_dir = Path(backend_dir).resolve()
+            cand = Path(backend_dir).resolve()
+            if cand.exists():
+                self.backend_dir = cand
         else:
-            # Check environment variable
             env_dir = os.environ.get("DOCWEAVE_BACKEND_DIR")
             if env_dir and Path(env_dir).resolve().exists():
                 self.backend_dir = Path(env_dir).resolve()
             else:
-                # Check candidate locations
                 candidates = [
                     Path.cwd() / "backend",
                     Path.cwd().parent / "backend",
@@ -39,20 +50,44 @@ class DiffWeaveMCPClient:
                     Path("C:/Users/Adhi/Desktop/DocWeave/backend"),
                     Path.home() / "Desktop" / "DocWeave" / "backend",
                 ]
-                self.backend_dir = Path("backend").resolve()
                 for cand in candidates:
                     if cand.exists():
                         self.backend_dir = cand.resolve()
                         break
 
+        if self.backend_dir and self.backend_dir.exists():
+            self.mode = "in_process"
+        else:
+            # Standalone fallback mode
+            self.mode = "standalone"
+            from diffweave.mcp.standalone_engine import StandaloneEngine
+            self._standalone_engine = StandaloneEngine()
+
     async def call_tool(self, name: str, arguments: Optional[dict[str, Any]] = None) -> Any:
         """
         Execute an MCP tool by name.
-        Uses in-process dispatch with real DocWeave DB session for optimal speed and reliability.
         """
         arguments = arguments or {}
 
-        # Ensure backend directory is in sys.path
+        # 1. Standalone Fallback
+        if self._standalone_engine:
+            return await self._standalone_engine.dispatch(name, arguments)
+
+        # 2. Remote HTTP MCP Transport
+        if self.mcp_url:
+            import httpx
+            async with httpx.AsyncClient(timeout=60.0) as http_client:
+                try:
+                    resp = await http_client.post(
+                        f"{self.mcp_url.rstrip('/')}/tools/{name}",
+                        json={"arguments": arguments},
+                    )
+                    resp.raise_for_status()
+                    return resp.json()
+                except Exception as e:
+                    raise MCPToolError(tool_name=name, message=f"Remote MCP request failed: {e}")
+
+        # 3. In-process dispatch with local DocWeave
         backend_str = str(self.backend_dir)
         if backend_str not in sys.path:
             sys.path.insert(0, backend_str)
@@ -60,10 +95,10 @@ class DiffWeaveMCPClient:
         try:
             from mcp_server import _dispatch, get_db, _get_current_user
         except ImportError as e:
-            raise MCPConnectionError(
-                f"Could not import DocWeave MCP server from '{self.backend_dir}': {e}",
-                details={"backend_dir": backend_str},
-            )
+            # Fall back to standalone engine if import fails
+            from diffweave.mcp.standalone_engine import StandaloneEngine
+            self._standalone_engine = StandaloneEngine()
+            return await self._standalone_engine.dispatch(name, arguments)
 
         db = get_db()
         try:
@@ -110,127 +145,82 @@ class DiffWeaveMCPClient:
         return await self.call_tool("get_workflow_status", {"workflow_id": workflow_id})
 
     async def list_workflows(self, workspace_id: str, status: Optional[str] = None) -> list[dict[str, Any]]:
-        args = {"workspace_id": workspace_id}
+        args: dict[str, Any] = {"workspace_id": workspace_id}
         if status:
             args["status"] = status
         return await self.call_tool("list_workflows", args)
 
-    async def cancel_workflow(self, workflow_id: str) -> dict[str, Any]:
-        return await self.call_tool("cancel_workflow", {"workflow_id": workflow_id})
+    async def get_run_metrics(self, workflow_id: str) -> dict[str, Any]:
+        return await self.call_tool("get_run_metrics", {"workflow_id": workflow_id})
 
-    async def list_pending_proposals(
-        self, workspace_id: str, document_version_id: Optional[str] = None
-    ) -> list[dict[str, Any]]:
-        args = {"workspace_id": workspace_id}
-        if document_version_id:
-            args["document_version_id"] = document_version_id
-        return await self.call_tool("list_pending_proposals", args)
+    async def list_proposals(self, workspace_id: str, status: Optional[str] = None) -> list[dict[str, Any]]:
+        args: dict[str, Any] = {"workspace_id": workspace_id}
+        if status:
+            args["status"] = status
+        return await self.call_tool("list_proposals", args)
+
+    async def get_proposal(self, proposal_id: str) -> dict[str, Any]:
+        return await self.call_tool("get_proposal", {"proposal_id": proposal_id})
 
     async def approve_proposal(self, proposal_id: str, comments: Optional[str] = None) -> dict[str, Any]:
-        args = {"proposal_id": proposal_id}
-        if comments:
-            args["comments"] = comments
-        return await self.call_tool("approve_proposal", args)
+        return await self.call_tool("approve_proposal", {"proposal_id": proposal_id, "comments": comments})
 
     async def reject_proposal(self, proposal_id: str, comments: Optional[str] = None) -> dict[str, Any]:
-        args = {"proposal_id": proposal_id}
-        if comments:
-            args["comments"] = comments
-        return await self.call_tool("reject_proposal", args)
+        return await self.call_tool("reject_proposal", {"proposal_id": proposal_id, "comments": comments})
 
     async def archive_proposal(self, proposal_id: str, comments: Optional[str] = None) -> dict[str, Any]:
-        args = {"proposal_id": proposal_id}
-        if comments:
-            args["comments"] = comments
-        return await self.call_tool("archive_proposal", args)
-
-    async def restore_proposal(self, proposal_id: str) -> dict[str, Any]:
-        return await self.call_tool("restore_proposal", {"proposal_id": proposal_id})
+        return await self.call_tool("archive_proposal", {"proposal_id": proposal_id, "comments": comments})
 
     async def batch_review_proposals(
-        self,
-        workspace_id: str,
-        decision: str,
-        proposal_ids: Optional[list[str]] = None,
-        comments: Optional[str] = None,
+        self, workspace_id: str, decision: str, proposal_ids: Optional[list[str]] = None, comments: Optional[str] = None
     ) -> dict[str, Any]:
-        args = {"workspace_id": workspace_id, "decision": decision}
+        args: dict[str, Any] = {"workspace_id": workspace_id, "decision": decision}
         if proposal_ids:
             args["proposal_ids"] = proposal_ids
         if comments:
             args["comments"] = comments
         return await self.call_tool("batch_review_proposals", args)
 
-    async def list_knowledge(
-        self, workspace_id: str, type: Optional[str] = None, status: Optional[str] = None
-    ) -> list[dict[str, Any]]:
-        args = {"workspace_id": workspace_id}
-        if type:
-            args["type"] = type
-        if status:
-            args["status"] = status
-        return await self.call_tool("list_knowledge", args)
+    async def get_semantic_diff(self, workspace_id: str) -> dict[str, Any]:
+        return await self.call_tool("get_semantic_diff", {"workspace_id": workspace_id})
 
-    async def get_knowledge_item(self, item_id: str) -> dict[str, Any]:
-        return await self.call_tool("get_knowledge_item", {"item_id": item_id})
-
-    async def search_knowledge(self, workspace_id: str, query: str) -> list[dict[str, Any]]:
-        return await self.call_tool("search_knowledge", {"workspace_id": workspace_id, "query": query})
-
-    async def get_semantic_diff(
-        self,
-        workspace_id: str,
-        proposal_id: Optional[str] = None,
-        document_version_id: Optional[str] = None,
-    ) -> dict[str, Any]:
-        args = {"workspace_id": workspace_id}
-        if proposal_id:
-            args["proposal_id"] = proposal_id
-        if document_version_id:
-            args["document_version_id"] = document_version_id
-        return await self.call_tool("get_semantic_diff", args)
-
-    async def validate_proposals(
-        self, workspace_id: str, proposal_id: Optional[str] = None
-    ) -> dict[str, Any]:
-        args = {"workspace_id": workspace_id}
-        if proposal_id:
-            args["proposal_id"] = proposal_id
-        return await self.call_tool("validate_proposals", args)
+    async def validate_proposals(self, workspace_id: str) -> dict[str, Any]:
+        return await self.call_tool("validate_proposals", {"workspace_id": workspace_id})
 
     async def get_knowledge_graph(self, workspace_id: str) -> dict[str, Any]:
         return await self.call_tool("get_knowledge_graph", {"workspace_id": workspace_id})
+
+    async def list_knowledge_items(self, workspace_id: str, status: Optional[str] = None) -> list[dict[str, Any]]:
+        args: dict[str, Any] = {"workspace_id": workspace_id}
+        if status:
+            args["status"] = status
+        return await self.call_tool("list_knowledge_items", args)
+
+    async def search_knowledge(self, workspace_id: str, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        return await self.call_tool("search_knowledge", {"workspace_id": workspace_id, "query": query, "limit": limit})
+
+    async def export_knowledge(self, workspace_id: str, format: str = "json") -> dict[str, Any]:
+        return await self.call_tool("export_knowledge", {"workspace_id": workspace_id, "format": format})
 
     async def list_rules(self, workspace_id: str) -> list[dict[str, Any]]:
         return await self.call_tool("list_rules", {"workspace_id": workspace_id})
 
     async def create_rule(
-        self, workspace_id: str, name: str, operator: str, configuration: dict[str, Any]
+        self, workspace_id: str, name: str, rule_type: str, condition: dict[str, Any], is_blocking: bool = True
     ) -> dict[str, Any]:
         return await self.call_tool(
             "create_rule",
             {
                 "workspace_id": workspace_id,
                 "name": name,
-                "operator": operator,
-                "configuration": configuration,
+                "rule_type": rule_type,
+                "condition": condition,
+                "is_blocking": is_blocking,
             },
         )
-
-    async def enable_rule(self, rule_id: str) -> dict[str, Any]:
-        return await self.call_tool("enable_rule", {"rule_id": rule_id})
-
-    async def disable_rule(self, rule_id: str) -> dict[str, Any]:
-        return await self.call_tool("disable_rule", {"rule_id": rule_id})
 
     async def delete_rule(self, rule_id: str) -> dict[str, Any]:
         return await self.call_tool("delete_rule", {"rule_id": rule_id})
 
-    async def get_dashboard_stats(self, workspace_id: str) -> dict[str, Any]:
-        return await self.call_tool("get_dashboard_stats", {"workspace_id": workspace_id})
-
-    async def get_activity_feed(self, workspace_id: str, limit: int = 50) -> dict[str, Any]:
+    async def get_activity_feed(self, workspace_id: str, limit: int = 50) -> list[dict[str, Any]]:
         return await self.call_tool("get_activity_feed", {"workspace_id": workspace_id, "limit": limit})
-
-    async def get_run_metrics(self, workflow_id: str) -> dict[str, Any]:
-        return await self.call_tool("get_run_metrics", {"workflow_id": workflow_id})
