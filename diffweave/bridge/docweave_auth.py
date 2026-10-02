@@ -3,6 +3,7 @@
 # and JWT signatures with DocWeave.
 
 import os
+import bcrypt
 import uuid
 import time
 import random
@@ -46,11 +47,24 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(pw_bytes.decode("utf-8", errors="ignore"))
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    pw_bytes = plain_password.encode("utf-8")[:72]
+    # 1. Native bcrypt.checkpw (avoids passlib __about__ bug across platforms)
     try:
-        pw_bytes = plain_password.encode("utf-8")[:72]
+        if bcrypt.checkpw(pw_bytes, hashed_password.encode("utf-8")):
+            return True
+    except Exception:
+        pass
+
+    # 2. Passlib CryptContext check
+    try:
         return pwd_context.verify(pw_bytes.decode("utf-8", errors="ignore"), hashed_password)
     except Exception as e:
-        logger.warning(f"Password verification error: {e}")
+        logger.warning(f"Passlib verification error: {e}")
+
+    # 3. Direct string verify
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
         return False
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
@@ -156,7 +170,9 @@ def login(email_or_username: str, password: str) -> dict:
             {"val": val}
         ).first()
 
-    if not row or not verify_password(password, row[3]):
+    if not row:
+        raise ValueError("Invalid email or password.")
+    if not verify_password(password, row[3]):
         raise ValueError("Invalid email or password.")
 
     token = create_access_token({"sub": row[2]})

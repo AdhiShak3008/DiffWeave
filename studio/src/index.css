@@ -73,7 +73,7 @@ code, pre, .font-mono {
 .dw-auth {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(0, 460px) 1fr;
+  grid-template-columns: minmax(0, 420px) 1fr;
   background: #0D1117;
   font-family: 'Inter', system-ui, sans-serif;
   color: #E2E8F0;
@@ -83,7 +83,7 @@ code, pre, .font-mono {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 60px 48px;
+  padding: 40px 36px;
   border-right: 1px solid #21262D;
 }
 
@@ -91,7 +91,7 @@ code, pre, .font-mono {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 48px;
+  margin-bottom: 28px;
 }
 
 .dw-auth__wordmark {
@@ -128,7 +128,7 @@ code, pre, .font-mono {
 }
 
 .dw-auth__title {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   color: #F8FAFC;
   margin: 0 0 8px;
@@ -138,7 +138,7 @@ code, pre, .font-mono {
 .dw-auth__subtitle {
   color: #6B7280;
   font-size: 14px;
-  margin: 0 0 32px;
+  margin: 0 0 20px;
   line-height: 1.6;
 }
 
@@ -233,26 +233,34 @@ code, pre, .font-mono {
   max-width: 360px;
 }
 
+.dw-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  max-width: 330px;
+  width: 100%;
+}
+
 .dw-field {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
 .dw-label {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: #CBD5E1;
 }
 
 .dw-input {
   width: 100%;
-  padding: 9px 13px;
+  padding: 8px 11px;
   background: #161B22;
   border: 1px solid #30363D;
-  border-radius: 8px;
+  border-radius: 6px;
   color: #E2E8F0;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
   box-sizing: border-box;
@@ -260,7 +268,7 @@ code, pre, .font-mono {
 
 .dw-input:focus {
   border-color: #10B981;
-  box-shadow: 0 0 0 3px rgba(16,185,129,0.15);
+  box-shadow: 0 0 0 2px rgba(16,185,129,0.15);
 }
 
 .dw-input--otp {
@@ -446,4 +454,38 @@ code, pre, .font-mono {
 .dw-auth-demo-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.dw-auth-form__options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.dw-auth-form__remember {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #94A3B8;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dw-auth-form__remember input[type="checkbox"],
+.dw-auth-form__show-password input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  accent-color: #10B981;
+}
+
+.dw-auth-form__link {
+  font-size: 12px;
+  color: #10B981;
+  text-decoration: none;
+}
+
+.dw-auth-form__link:hover {
+  text-decoration: underline;
 }
