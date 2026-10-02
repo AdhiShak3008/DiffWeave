@@ -1,235 +1,256 @@
 import React, { useState } from 'react';
+import {
+  ShieldCheck,
+  Plus,
+  Play,
+  Trash2,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Sliders,
+  Filter,
+  Code2,
+  FileCheck2
+} from 'lucide-react';
+import { api } from '../api/client';
 
-export default function PolicyRulesLab({ rules, onToggleRule, onCreateRule, onRunValidation, validationResult }) {
+export default function PolicyRulesLab({ rules, currentWorkspace, onCreateRule, onDeleteRule, onValidate, loading }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [ruleName, setRuleName] = useState('');
-  const [operator, setOperator] = useState('min_confidence');
-  const [threshold, setThreshold] = useState(0.85);
+  const [ruleType, setRuleType] = useState('CONFIDENCE_THRESHOLD');
+  const [conditionVal, setConditionVal] = useState('0.85');
+  const [isBlocking, setIsBlocking] = useState(true);
+
+  const [lintResults, setLintResults] = useState(null);
   const [validating, setValidating] = useState(false);
 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!ruleName.trim()) return;
 
-    let config = {};
-    if (operator === 'min_confidence') {
-      config = { value: parseFloat(threshold) };
-    } else if (operator === 'allowed_proposal_types') {
-      config = { values: ['CREATE', 'UPDATE'] };
+    let condition = {};
+    if (ruleType === 'CONFIDENCE_THRESHOLD') {
+      condition = { min_confidence: parseFloat(conditionVal) || 0.85 };
+    } else if (ruleType === 'REGEX_FORMAT') {
+      condition = { pattern: conditionVal };
+    } else {
+      condition = { field: conditionVal };
     }
 
-    await onCreateRule(ruleName.trim(), operator, config);
+    await onCreateRule(ruleName.trim(), ruleType, condition, isBlocking);
     setRuleName('');
     setShowAddModal(false);
   };
 
-  const handleRunCheck = async () => {
+  const runLinter = async () => {
+    if (!currentWorkspace?.id) return;
     setValidating(true);
     try {
-      await onRunValidation();
+      const res = await onValidate();
+      setLintResults(res);
     } finally {
       setValidating(false);
     }
   };
 
-  const ruleList = rules || [];
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-xl bg-[#0E1524] border border-slate-800">
-        <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span>Policy Rules & CI Linter</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono">
-              {ruleList.length} Configured Rules
-            </span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Dynamic gates that validate extracted claims during ingestion. Failing rules automatically block auto-merge and open a Knowledge PR.
-          </p>
+      {/* Policy Rules Lab Header */}
+      <div className="bg-[#0C101A] border border-slate-800/90 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <ShieldCheck className="w-5 h-5 text-emerald-400" />
+          <div>
+            <h2 className="text-sm font-semibold text-white">Policy as Code (CI Linting Engine)</h2>
+            <p className="text-[11px] text-slate-400">Automated quality gates and regulatory guardrails executed before knowledge merges.</p>
+          </div>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2.5">
+          <button
+            onClick={runLinter}
+            disabled={validating}
+            className="px-3.5 py-1.5 rounded-lg bg-[#141B2D] hover:bg-[#1E2740] border border-slate-700 text-slate-200 text-xs font-semibold transition flex items-center space-x-1.5 shadow-sm"
+          >
+            <Play className={`w-3.5 h-3.5 text-emerald-400 ${validating ? 'animate-spin' : ''}`} />
+            <span>{validating ? 'Linting PRs...' : 'Dry-Run CI Check'}</span>
+          </button>
+
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-3 py-2 text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition"
+            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition flex items-center space-x-1.5 shadow-sm shadow-emerald-600/30"
           >
-            + Add Rule
-          </button>
-          <button
-            disabled={validating}
-            onClick={handleRunCheck}
-            className="px-4 py-2 text-xs font-semibold text-black bg-emerald-400 hover:bg-emerald-300 rounded-lg transition shadow disabled:opacity-50"
-          >
-            {validating ? 'Evaluating...' : '▶ Run Compliance Check'}
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Policy Rule</span>
           </button>
         </div>
       </div>
 
-      {/* Validation Result Box */}
-      {validationResult && (
-        <div
-          className={`p-5 rounded-xl border ${
-            validationResult.compliant
-              ? 'bg-emerald-950/20 border-emerald-500/30'
-              : 'bg-rose-950/20 border-rose-500/30'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <span>Policy Evaluation Report</span>
-              <span
-                className={`text-xs px-2 py-0.5 rounded font-mono ${
-                  validationResult.compliant
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : 'bg-rose-500/20 text-rose-300'
-                }`}
-              >
-                {validationResult.compliant ? '[PASS] Compliant' : '[FAIL] Violations Detected'}
+      {/* Lint Results Suite (GitHub Actions Style) */}
+      {lintResults && (
+        <div className="bg-[#0D121F] border border-slate-800 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center space-x-2">
+              <FileCheck2 className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                CI Check Suite Summary
               </span>
-            </h3>
-            <span className="text-xs text-slate-400 font-mono">
-              Proposals Checked: {validationResult.proposals_evaluated || 0}
+            </div>
+            <span
+              className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-bold ${
+                lintResults.has_violations
+                  ? 'bg-rose-500/10 text-rose-300 border border-rose-500/30'
+                  : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30'
+              }`}
+            >
+              {lintResults.has_violations
+                ? `FAILED: ${lintResults.violations_count} Violations`
+                : 'ALL CHECKS PASSED'}
             </span>
           </div>
 
-          <div className="space-y-2 mt-3">
-            {(validationResult.results || []).map((r, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between text-xs p-2.5 rounded bg-slate-900/60 border border-slate-800"
-              >
-                <div className="flex items-center space-x-2">
-                  <span
-                    className={`font-bold font-mono px-1.5 py-0.5 rounded text-[10px] ${
-                      r.status === 'PASS'
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : r.status === 'FAIL'
-                        ? 'bg-rose-500/20 text-rose-400'
-                        : 'bg-amber-500/20 text-amber-300'
-                    }`}
-                  >
-                    {r.status}
-                  </span>
-                  <span className="text-white font-medium">{r.rule_name}</span>
+          <div className="divide-y divide-slate-800/80 text-xs font-mono">
+            {(lintResults.validations || []).map((val, idx) => (
+              <div key={idx} className="py-2.5 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  {val.severity === 'PASS' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  )}
+                  <div>
+                    <span className="text-white font-medium">{val.rule_name}</span>
+                    <span className="text-slate-400 ml-2 font-sans text-[11px]">{val.message}</span>
+                  </div>
                 </div>
-                <span className="text-slate-400 italic text-[11px]">{r.message}</span>
+
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                    val.severity === 'PASS' ? 'text-emerald-400 bg-emerald-950/40' : 'text-rose-400 bg-rose-950/40'
+                  }`}
+                >
+                  {val.severity}
+                </span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Rules Table */}
-      <div className="rounded-xl border border-slate-800 bg-[#0F1524] overflow-hidden">
-        <table className="w-full text-left text-xs text-slate-300">
-          <thead className="bg-[#121A2C] text-slate-400 font-mono text-[11px] border-b border-slate-800">
-            <tr>
-              <th className="px-5 py-3 font-semibold">Rule Name</th>
-              <th className="px-5 py-3 font-semibold">Operator</th>
-              <th className="px-5 py-3 font-semibold">Configuration</th>
-              <th className="px-5 py-3 font-semibold">Enforcement</th>
-              <th className="px-5 py-3 font-semibold text-right">Toggle</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/60 font-medium">
-            {ruleList.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-800/30 transition">
-                <td className="px-5 py-3 font-semibold text-white">{r.name}</td>
-                <td className="px-5 py-3 font-mono text-cyan-400">{r.operator}</td>
-                <td className="px-5 py-3 font-mono text-slate-400">
-                  {JSON.stringify(r.configuration || {})}
-                </td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono ${
-                      r.enabled
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {r.enabled ? 'ACTIVE' : 'DISABLED'}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <button
-                    onClick={() => onToggleRule(r.id, r.enabled)}
-                    className={`px-3 py-1 rounded text-xs font-semibold transition ${
-                      r.enabled
-                        ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
-                        : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
-                    }`}
-                  >
-                    {r.enabled ? 'Disable' : 'Enable'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Active Rules Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {rules.map((rule) => (
+          <div
+            key={rule.id}
+            className="bg-[#0D121F] border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4 hover:border-slate-700 transition"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-white tracking-wide">{rule.name}</span>
+                <span
+                  className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                    rule.is_blocking
+                      ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
+                      : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                  }`}
+                >
+                  {rule.is_blocking ? 'BLOCKING GATE' : 'ADVISORY'}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 text-xs font-mono text-slate-400">
+                <div className="flex justify-between text-[11px]">
+                  <span>Type:</span>
+                  <span className="text-slate-200">{rule.rule_type}</span>
+                </div>
+                <div className="bg-[#141B2D] p-2 rounded border border-slate-800/80 text-[11px] text-slate-300">
+                  {JSON.stringify(rule.condition || {})}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+              <span className="text-[10px] text-slate-500 font-mono">ID: {rule.id.slice(0, 8)}</span>
+              <button
+                onClick={() => onDeleteRule(rule.id)}
+                className="text-slate-500 hover:text-rose-400 transition p-1"
+                title="Delete Rule"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Add Rule Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#101726] border border-slate-700 p-6 rounded-xl w-full max-w-md shadow-2xl">
-            <h3 className="text-lg font-semibold text-white mb-4">Add Validation Rule</h3>
-            <form onSubmit={handleCreate}>
-              <div className="mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md">
+          <div className="bg-[#0D121F] border border-slate-700/80 p-6 rounded-2xl w-full max-w-md shadow-2xl">
+            <h3 className="text-base font-semibold text-white mb-4">Add Validation Policy Rule</h3>
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Rule Name</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Strict Confidence Check"
+                  placeholder="e.g. Clinical Endpoint Floor Check"
                   value={ruleName}
                   onChange={(e) => setRuleName(e.target.value)}
-                  className="w-full bg-[#162032] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
-              <div className="mb-4">
-                <label className="block text-xs font-medium text-slate-400 mb-1">Operator</label>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Rule Condition Type</label>
                 <select
-                  value={operator}
-                  onChange={(e) => setOperator(e.target.value)}
-                  className="w-full bg-[#162032] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  value={ruleType}
+                  onChange={(e) => setRuleType(e.target.value)}
+                  className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
-                  <option value="min_confidence">min_confidence (Block low confidence extractions)</option>
-                  <option value="required_evidence">required_evidence (Mandate verbatim quotes)</option>
-                  <option value="allowed_proposal_types">allowed_proposal_types (Constrain types)</option>
+                  <option value="CONFIDENCE_THRESHOLD">Confidence Threshold Floor</option>
+                  <option value="REGEX_FORMAT">RegEx Format Validator</option>
+                  <option value="REQUIRED_FIELD">Required Field Presence</option>
                 </select>
               </div>
 
-              {operator === 'min_confidence' && (
-                <div className="mb-6">
-                  <label className="block text-xs font-medium text-slate-400 mb-1">
-                    Minimum Confidence Threshold: {(threshold * 100).toFixed(0)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="1.0"
-                    step="0.05"
-                    value={threshold}
-                    onChange={(e) => setThreshold(e.target.value)}
-                    className="w-full accent-emerald-400"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Threshold / Pattern Value</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 0.85 or ^PROTOCOL-[A-Z0-9-]+$"
+                  value={conditionVal}
+                  onChange={(e) => setConditionVal(e.target.value)}
+                  className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
 
-              <div className="flex justify-end space-x-3 mt-6">
+              <div className="flex items-center space-x-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="blockingCheck"
+                  checked={isBlocking}
+                  onChange={(e) => setIsBlocking(e.target.checked)}
+                  className="rounded border-slate-700 text-emerald-600 focus:ring-emerald-500 bg-[#141B2D]"
+                />
+                <label htmlFor="blockingCheck" className="text-xs text-slate-300 font-medium">
+                  Enforce as Blocking Gate (Prevents PR Merge if failed)
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-lg bg-slate-800"
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-white transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-medium text-black bg-emerald-400 hover:bg-emerald-300 rounded-lg font-semibold"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition"
                 >
-                  Add Rule
+                  Save Policy Rule
                 </button>
               </div>
             </form>

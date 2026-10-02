@@ -1,22 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import {
+  Upload,
+  FileText,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Terminal,
+  FileCode,
+  ArrowRight,
+  Sparkles,
+  RefreshCw
+} from 'lucide-react';
 
-export default function IngestionStaging({ documents, onUpload, loading }) {
+export default function IngestionStaging({ documents, onUploadDocument, currentWorkspace, loading }) {
+  const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const [uploadMessage, setUploadMessage] = useState(null);
+  const [terminalLogs, setTerminalLogs] = useState([
+    '[0.00s] DiffWeave Staging ready. Bound to DocWeave FastMCP engine.',
+    '[0.02s] Workspace ID: ' + (currentWorkspace?.id || '4314fb04-95be-41a2-bef4-50bf27c9c363'),
+    '[0.05s] Monitoring document staging buffer...',
+  ]);
+  const fileInputRef = useRef(null);
 
-  const handleFiles = async (files) => {
-    if (!files || files.length === 0) return;
+  const addLog = (msg) => {
+    setTerminalLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  };
+
+  const handleFile = async (file) => {
+    if (!file) return;
     setUploading(true);
-    setUploadMessage('Ingesting document into DocWeave pipeline...');
+    addLog(`Ingesting file: ${file.name} (${Math.round(file.size / 1024)} KB)...`);
+    addLog(`Running LangGraph neural extraction pipeline...`);
+
     try {
-      const file = files[0];
-      const res = await onUpload(file);
-      setUploadMessage(`Successfully staged ${file.name}! Workflow: ${res.workflow_id?.slice(0, 8)}`);
+      await onUploadDocument(file);
+      addLog(`DocWeave workflow completed for ${file.name}`);
+      addLog(`3-Way semantic fact proposals generated successfully.`);
     } catch (err) {
-      setUploadMessage(`Upload failed: ${err.message}`);
+      addLog(`Upload error: ${err.message}`);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
     }
   };
 
@@ -26,131 +57,102 @@ export default function IngestionStaging({ documents, onUpload, loading }) {
       <div
         onDragOver={(e) => {
           e.preventDefault();
-          setDragOver(true);
+          setDragActive(true);
         }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          handleFiles(e.dataTransfer.files);
-        }}
-        className={`border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-          dragOver
-            ? 'border-emerald-500 bg-emerald-500/10'
-            : 'border-slate-700/80 bg-[#0E1524]/60 hover:border-slate-600'
+        onDragLeave={() => setDragActive(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition flex flex-col items-center justify-center space-y-3 ${
+          dragActive
+            ? 'border-emerald-400 bg-emerald-500/10'
+            : 'border-slate-800 bg-[#0C101A] hover:border-slate-700 hover:bg-[#0E1422]'
         }`}
       >
-        <div className="max-w-md mx-auto">
-          <span className="text-3xl text-emerald-400 block mb-2">📄</span>
-          <h3 className="text-sm font-semibold text-white">Stage Documents for Ingestion</h3>
-          <p className="text-xs text-slate-400 mt-1 mb-4">
-            Drop PDFs, Word documents (.docx), or clinical texts (.txt) here to start automated extraction.
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files[0]) {
+              handleFile(e.target.files[0]);
+            }
+          }}
+        />
+
+        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/10">
+          <Upload className="w-6 h-6" />
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-white">Stage Document for Knowledge Extraction</h3>
+          <p className="text-xs text-slate-400 mt-1">
+            Drag & drop clinical protocols, amendments, or regulatory specs (TXT, PDF, DOCX)
           </p>
+        </div>
 
-          <label className="inline-block px-4 py-2 text-xs font-semibold text-black bg-emerald-400 hover:bg-emerald-300 rounded-lg cursor-pointer transition shadow">
-            <span>Browse Document File</span>
-            <input
-              type="file"
-              className="hidden"
-              onChange={(e) => handleFiles(e.target.files)}
-              disabled={uploading}
-            />
-          </label>
+        <button
+          type="button"
+          disabled={uploading}
+          className="px-4 py-2 rounded-xl bg-[#141B2D] hover:bg-[#1E2740] border border-slate-700 text-xs font-semibold text-slate-200 transition shadow-sm"
+        >
+          {uploading ? 'Processing Extraction...' : 'Select File from Disk'}
+        </button>
+      </div>
 
-          {uploadMessage && (
-            <p className="text-xs text-emerald-300 mt-3 font-mono animate-fade-in">{uploadMessage}</p>
+      {/* Grid: Staged Documents Table & Live Terminal */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Staged Documents List (7 cols) */}
+        <div className="lg:col-span-7 bg-[#0D121F] border border-slate-800 rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <span className="text-xs font-bold text-white flex items-center space-x-2">
+              <FileCode className="w-4 h-4 text-emerald-400" />
+              <span>Tracked Staged Documents ({documents.length})</span>
+            </span>
+          </div>
+
+          {documents.length === 0 ? (
+            <div className="py-12 text-center text-xs text-slate-500">
+              No documents staged yet in this workspace. Upload a file above to begin.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-800/80 text-xs font-mono">
+              {documents.map((doc) => (
+                <div key={doc.id} className="py-3 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                    <div>
+                      <span className="text-white font-medium block">{doc.filename}</span>
+                      <span className="text-slate-500 text-[10px]">ID: {doc.id.slice(0, 8)}</span>
+                    </div>
+                  </div>
+
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {doc.status || 'COMMITTED'}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Real-time Ingestion Pipeline Visualizer */}
-      <div className="p-5 rounded-xl bg-[#0F1524] border border-slate-800">
-        <h3 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-3">
-          Automated Extraction & Reconciliation Pipeline
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {[
-            { step: '1. Ingestion', desc: 'Text Layout & OCR' },
-            { step: '2. Chunking', desc: 'Semantic Windows' },
-            { step: '3. Extraction', desc: 'Atomic Fact LLM' },
-            { step: '4. Reconciliation', desc: 'RRF & Collision Detect' },
-            { step: '5. Rule Linter', desc: 'Policy Gate Check' },
-          ].map((s, idx) => (
-            <div key={idx} className="p-3 rounded-lg bg-slate-900/80 border border-slate-800">
-              <span className="text-[11px] font-bold text-emerald-400 block">{s.step}</span>
-              <span className="text-[10px] text-slate-400 block mt-0.5">{s.desc}</span>
+        {/* Live Pipeline Terminal (5 cols) */}
+        <div className="lg:col-span-5 bg-[#080B11] border border-slate-800 rounded-2xl p-4 font-mono text-[11px] flex flex-col h-[380px] shadow-inner">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-900 text-slate-400">
+            <div className="flex items-center space-x-2">
+              <Terminal className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-slate-200 font-semibold">Live Ingestion Stream</span>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Document Inventory Table */}
-      <div className="rounded-xl border border-slate-800 bg-[#0F1524] overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white">Tracked Workspace Documents</h3>
-          <span className="text-xs text-slate-400 font-mono">{documents?.length || 0} files</span>
-        </div>
-
-        {documents?.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 text-xs">
-            No documents uploaded to this workspace yet.
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-[#121A2C] text-slate-400 font-mono text-[11px] border-b border-slate-800">
-                <tr>
-                  <th className="px-5 py-3 font-semibold">Filename</th>
-                  <th className="px-5 py-3 font-semibold">Pipeline State</th>
-                  <th className="px-5 py-3 font-semibold">Document UUID</th>
-                  <th className="px-5 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-medium">
-                {documents.map((d) => {
-                  const status = d.workflow_status || d.status || 'COMPLETED';
-                  let statusBadge = (
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400">{status}</span>
-                  );
-                  if (status === 'COMPLETED') {
-                    statusBadge = (
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        ✔ COMMITTED
-                      </span>
-                    );
-                  } else if (status === 'WAITING_FOR_REVIEW') {
-                    statusBadge = (
-                      <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
-                        ● REVIEW REQUIRED
-                      </span>
-                    );
-                  } else if (status === 'RUNNING') {
-                    statusBadge = (
-                      <span className="px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 animate-pulse">
-                        ⚙ PROCESSING
-                      </span>
-                    );
-                  }
 
-                  return (
-                    <tr key={d.document_id} className="hover:bg-slate-800/30 transition">
-                      <td className="px-5 py-3 text-white font-semibold">{d.filename}</td>
-                      <td className="px-5 py-3">{statusBadge}</td>
-                      <td className="px-5 py-3 font-mono text-slate-500">
-                        {d.document_id?.slice(0, 12)}...
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          WF: {d.workflow_id?.slice(0, 8) || 'N/A'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="flex-1 overflow-y-auto space-y-1.5 pt-3 text-slate-300 pr-1">
+            {terminalLogs.map((log, i) => (
+              <div key={i} className="leading-relaxed">
+                <span className="text-emerald-400">&gt;</span> {log}
+              </div>
+            ))}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

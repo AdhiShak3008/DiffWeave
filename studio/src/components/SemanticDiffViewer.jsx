@@ -1,264 +1,408 @@
 import React, { useState } from 'react';
+import {
+  FileDiff,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Archive,
+  Layers,
+  Sparkles,
+  Quote,
+  Eye,
+  Columns,
+  AlignLeft,
+  ChevronRight,
+  MessageSquare,
+  Send,
+  SlidersHorizontal,
+  ShieldCheck
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
 
-export default function SemanticDiffViewer({ diff, onReview, loading }) {
-  const [filter, setFilter] = useState('all'); // all, conflicts, additions, changes
-  const [actingId, setActingId] = useState(null);
+export default function SemanticDiffViewer({ diffData, onReviewProposal, onBatchReview, loading }) {
+  const [viewMode, setViewMode] = useState('split'); // 'split' | 'unified'
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'conflicts' | 'additions' | 'changes'
+  const [comments, setComments] = useState({});
+  const [expandedComments, setExpandedComments] = useState({});
+  const [actionLoading, setActionLoading] = useState({});
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-20 text-slate-400">
-        <span className="pulse-glow mr-3">⚙</span> Generating semantic knowledge diff...
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs text-slate-400 font-mono">Running semantic fact diff against Master Knowledge Register...</p>
       </div>
     );
   }
 
-  const summary = diff?.summary || {};
-  const conflicts = diff?.conflicts || [];
-  const additions = diff?.additions || [];
-  const changes = diff?.changes || [];
-  const removals = diff?.removals || [];
+  const additions = diffData?.additions || [];
+  const changes = diffData?.changes || [];
+  const conflicts = diffData?.conflicts || [];
+  const removals = diffData?.removals || [];
+
+  const totalDeltas = additions.length + changes.length + conflicts.length + removals.length;
 
   const handleAction = async (proposalId, decision) => {
-    setActingId(proposalId);
+    setActionLoading((prev) => ({ ...prev, [proposalId]: true }));
     try {
-      await onReview(proposalId, decision);
+      await onReviewProposal(proposalId, decision, comments[proposalId] || '');
+      if (decision === 'APPROVED') {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.8 },
+          colors: ['#10B981', '#14B8A6', '#3B82F6'],
+        });
+      }
     } finally {
-      setActingId(null);
+      setActionLoading((prev) => ({ ...prev, [proposalId]: false }));
     }
   };
 
-  const totalDiffs = (conflicts.length + additions.length + changes.length + removals.length);
+  const handleBatch = async (decision) => {
+    await onBatchReview(decision);
+    if (decision === 'APPROVED') {
+      confetti({
+        particleCount: 90,
+        spread: 80,
+        origin: { y: 0.7 },
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Top Banner / Summary */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-xl bg-[#0E1524] border border-slate-800">
-        <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span>Knowledge Semantic Diff</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
-              {totalDiffs} changes detected
+      {/* Diff Toolbar & Delta Summary */}
+      <div className="bg-[#0C101A] border border-slate-800/90 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <FileDiff className="w-5 h-5 text-emerald-400" />
+            <span className="font-semibold text-white text-sm">3-Way Semantic Fact Diff</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono font-medium">
+              {totalDeltas} pending {totalDeltas === 1 ? 'delta' : 'deltas'}
             </span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Compares newly extracted document facts against committed production truths with verbatim evidence provenance.
-          </p>
+          </div>
+
+          <div className="hidden sm:flex items-center space-x-2 text-xs font-mono">
+            <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+              +{additions.length} added
+            </span>
+            <span className="text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+              ~{changes.length} updated
+            </span>
+            {conflicts.length > 0 && (
+              <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 flex items-center space-x-1">
+                <AlertTriangle className="w-3 h-3 text-rose-400" />
+                <span>!{conflicts.length} conflicts</span>
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-              filter === 'all' ? 'bg-slate-700 text-white' : 'bg-slate-800/60 text-slate-400 hover:text-white'
-            }`}
-          >
-            All ({totalDiffs})
-          </button>
-          <button
-            onClick={() => setFilter('conflicts')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1 ${
-              filter === 'conflicts' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-slate-800/60 text-slate-400 hover:text-white'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-            <span>Conflicts ({conflicts.length})</span>
-          </button>
-          <button
-            onClick={() => setFilter('additions')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1 ${
-              filter === 'additions' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800/60 text-slate-400 hover:text-white'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-            <span>Additions ({additions.length})</span>
-          </button>
-          <button
-            onClick={() => setFilter('changes')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1 ${
-              filter === 'changes' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800/60 text-slate-400 hover:text-white'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-            <span>Updates ({changes.length})</span>
-          </button>
+        {/* View Controls & Filters */}
+        <div className="flex items-center space-x-3 text-xs">
+          {/* Filter Pills */}
+          <div className="flex items-center bg-[#141B2D] p-1 rounded-lg border border-slate-800">
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-2.5 py-1 rounded font-medium transition ${
+                filterType === 'all' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              All ({totalDeltas})
+            </button>
+            <button
+              onClick={() => setFilterType('conflicts')}
+              className={`px-2.5 py-1 rounded font-medium transition flex items-center space-x-1 ${
+                filterType === 'conflicts' ? 'bg-rose-900/60 text-rose-300' : 'text-slate-400 hover:text-rose-300'
+              }`}
+            >
+              <span>Conflicts</span>
+              {conflicts.length > 0 && (
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+              )}
+            </button>
+            <button
+              onClick={() => setFilterType('additions')}
+              className={`px-2.5 py-1 rounded font-medium transition ${
+                filterType === 'additions' ? 'bg-emerald-950/60 text-emerald-300' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Additions
+            </button>
+          </div>
+
+          {/* Split / Unified Toggle */}
+          <div className="flex items-center bg-[#141B2D] p-1 rounded-lg border border-slate-800">
+            <button
+              onClick={() => setViewMode('split')}
+              className={`p-1.5 rounded transition ${viewMode === 'split' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              title="Split View (Side by Side)"
+            >
+              <Columns className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode('unified')}
+              className={`p-1.5 rounded transition ${viewMode === 'unified' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              title="Unified View"
+            >
+              <AlignLeft className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Bulk Approve Button */}
+          {totalDeltas > 0 && (
+            <button
+              onClick={() => handleBatch('APPROVED')}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition shadow-sm shadow-emerald-600/20 flex items-center space-x-1.5"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Approve All</span>
+            </button>
+          )}
         </div>
       </div>
 
-      {totalDiffs === 0 ? (
-        <div className="text-center py-16 border border-dashed border-slate-800 rounded-xl bg-[#090E17]">
-          <span className="text-3xl text-emerald-400">✔</span>
-          <h3 className="text-base font-semibold text-white mt-2">Workspace Knowledge is in Sync</h3>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-            No uncommitted or conflicting knowledge items found. Upload documents via the Staging tab or dw add.
+      {totalDeltas === 0 ? (
+        <div className="bg-[#0C101A] border border-slate-800/80 rounded-2xl p-16 text-center shadow-inner">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-semibold text-white mb-1">Knowledge Register is Up to Date</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto mb-6">
+            No pending knowledge proposals or conflicts found. Stage a new document or protocol version to generate 3-way fact diffs.
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Conflicts (Red / Contradiction) */}
-          {(filter === 'all' || filter === 'conflicts') &&
-            conflicts.map((c, idx) => {
-              const evidenceList = c.proposed?.evidence || [];
-              const quote = evidenceList[0]?.quote || 'No verbatim citation';
-              const page = evidenceList[0]?.page_number || 'N/A';
-
-              return (
-                <div key={c.proposal_id || idx} className="rounded-xl border border-rose-500/30 bg-[#0F1422] p-5 shadow-lg">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                        ! CONTRADICTION COLLISION
-                      </span>
-                      <span className="text-xs text-slate-400 font-mono">PR: {c.proposal_id?.slice(0, 8)}</span>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <button
-                        disabled={actingId === c.proposal_id}
-                        onClick={() => handleAction(c.proposal_id, 'APPROVED')}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 transition disabled:opacity-50"
-                      >
-                        ✓ Accept & Merge
-                      </button>
-                      <button
-                        disabled={actingId === c.proposal_id}
-                        onClick={() => handleAction(c.proposal_id, 'REJECTED')}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition disabled:opacity-50"
-                      >
-                        ✕ Reject
-                      </button>
-                    </div>
-                  </div>
-
-                  <h3 className="text-sm font-semibold text-white mb-3">{c.title}</h3>
-
-                  {/* 3-Way Split Diff */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Baseline truth */}
-                    <div className="rounded-lg bg-rose-950/20 border border-rose-500/20 p-4">
-                      <span className="text-[11px] font-mono text-rose-400 uppercase tracking-wider block mb-1">
-                        ◀ Baseline Truth (Committed)
-                      </span>
-                      <p className="text-sm text-slate-200 font-medium">"{c.existing?.value || 'N/A'}"</p>
-                      <span className="text-[11px] text-slate-400 mt-2 block font-mono">
-                        Confidence: {c.existing?.confidence || 1.0}
-                      </span>
-                    </div>
-
-                    {/* Proposed incoming */}
-                    <div className="rounded-lg bg-emerald-950/20 border border-emerald-500/20 p-4">
-                      <span className="text-[11px] font-mono text-emerald-400 uppercase tracking-wider block mb-1">
-                        ▶ Proposed Change (From Incoming Document)
-                      </span>
-                      <p className="text-sm text-slate-100 font-medium">"{c.proposed?.value}"</p>
-                      <div className="mt-3 pt-2 border-t border-emerald-500/10">
-                        <span className="text-[11px] text-slate-400 block font-mono mb-1">
-                          Verbatim Evidence (Page {page}):
-                        </span>
-                        <blockquote className="text-xs text-cyan-300 italic bg-cyan-950/20 p-2 rounded border-l-2 border-cyan-500">
-                          "{quote}"
-                        </blockquote>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-          {/* Additions (Green) */}
-          {(filter === 'all' || filter === 'additions') &&
-            additions.map((a, idx) => {
-              const evidenceList = a.evidence || [];
-              const quote = evidenceList[0]?.quote || 'No verbatim citation';
-              const page = evidenceList[0]?.page_number || 'N/A';
-
-              return (
-                <div key={a.proposal_id || idx} className="rounded-xl border border-emerald-500/30 bg-[#0F1422] p-5 shadow-lg">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        + NEW {a.type || 'CLAIM'}
-                      </span>
-                      <span className="text-xs text-slate-400 font-mono">PR: {a.proposal_id?.slice(0, 8)}</span>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <button
-                        disabled={actingId === a.proposal_id}
-                        onClick={() => handleAction(a.proposal_id, 'APPROVED')}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 transition disabled:opacity-50"
-                      >
-                        ✓ Commit Fact
-                      </button>
-                      <button
-                        disabled={actingId === a.proposal_id}
-                        onClick={() => handleAction(a.proposal_id, 'REJECTED')}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition disabled:opacity-50"
-                      >
-                        ✕ Reject
-                      </button>
-                    </div>
-                  </div>
-
-                  <h3 className="text-sm font-semibold text-white mb-2">{a.title}</h3>
-                  <div className="rounded-lg bg-emerald-950/15 border border-emerald-500/15 p-4 mb-3">
-                    <span className="text-[11px] font-mono text-emerald-400 block mb-1">Extracted Value:</span>
-                    <p className="text-sm text-slate-100 font-medium">"{a.proposed_value}"</p>
-                  </div>
-
-                  <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/80">
-                    <span className="text-[11px] text-slate-400 block font-mono mb-1">
-                      Verbatim Document Evidence (Page {page}):
+          {/* Conflicts Section */}
+          {(filterType === 'all' || filterType === 'conflicts') && conflicts.map((c) => (
+            <div
+              key={c.proposal_id}
+              className="bg-[#0D121F] border border-rose-500/40 rounded-xl overflow-hidden shadow-lg shadow-rose-950/20 transition hover:border-rose-500/70"
+            >
+              {/* Card Header */}
+              <div className="bg-rose-950/25 px-4 py-2.5 border-b border-rose-500/30 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="p-1 rounded bg-rose-500/20 text-rose-300">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  </span>
+                  <div>
+                    <span className="text-xs font-semibold text-white tracking-wide">{c.title || 'Fact Conflict'}</span>
+                    <span className="ml-2 text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      Conflict
                     </span>
-                    <blockquote className="text-xs text-cyan-300 italic">"{quote}"</blockquote>
-                  </div>
-                </div>
-              );
-            })}
-
-          {/* Changes / Updates (Amber) */}
-          {(filter === 'all' || filter === 'changes') &&
-            changes.map((ch, idx) => (
-              <div key={ch.proposal_id || idx} className="rounded-xl border border-amber-500/30 bg-[#0F1422] p-5 shadow-lg">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-                  <div className="flex items-center space-x-2">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                      ~ MODIFIED CLAIM
-                    </span>
-                    <span className="text-xs text-slate-400 font-mono">PR: {ch.proposal_id?.slice(0, 8)}</span>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <button
-                      disabled={actingId === ch.proposal_id}
-                      onClick={() => handleAction(ch.proposal_id, 'APPROVED')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/40 transition disabled:opacity-50"
-                    >
-                      ✓ Merge Update
-                    </button>
-                    <button
-                      disabled={actingId === ch.proposal_id}
-                      onClick={() => handleAction(ch.proposal_id, 'REJECTED')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 transition disabled:opacity-50"
-                    >
-                      ✕ Reject
-                    </button>
                   </div>
                 </div>
 
-                <h3 className="text-sm font-semibold text-white mb-2">{ch.title}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="p-3 rounded bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-slate-400 block font-mono">Existing:</span>
-                    <p className="text-xs text-slate-300 mt-1 font-medium">{ch.existing?.value || 'N/A'}</p>
-                  </div>
-                  <div className="p-3 rounded bg-amber-950/20 border border-amber-500/20">
-                    <span className="text-[10px] text-amber-400 block font-mono">Proposed Update:</span>
-                    <p className="text-xs text-amber-200 mt-1 font-medium">{ch.proposed?.value || 'N/A'}</p>
-                  </div>
+                <div className="flex items-center space-x-2 text-xs">
+                  <span className="text-slate-400 font-mono text-[11px]">ID: {c.proposal_id.slice(0, 8)}</span>
                 </div>
               </div>
-            ))}
+
+              {/* Conflict Body */}
+              <div className="p-4 space-y-4">
+                {c.rationale && (
+                  <p className="text-xs text-slate-300 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800 leading-relaxed font-sans">
+                    <strong className="text-rose-400">Reconciliation Note: </strong>
+                    {c.rationale}
+                  </p>
+                )}
+
+                {/* Side by Side Diff Comparison */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                  {/* Baseline / Existing */}
+                  <div className="bg-[#13111C] border border-slate-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between text-slate-400 text-[11px] mb-2 pb-1 border-b border-slate-800/80">
+                      <span className="text-slate-400 flex items-center space-x-1">
+                        <span>- Master Truth (Existing Fact)</span>
+                      </span>
+                      <span className="text-[10px] text-slate-500">Conf: {Math.round((c.existing?.confidence || 0.9) * 100)}%</span>
+                    </div>
+                    <div className="text-rose-200 bg-rose-950/20 p-2 rounded border border-rose-900/30 leading-relaxed break-words">
+                      {c.existing?.value || 'N/A'}
+                    </div>
+                  </div>
+
+                  {/* Proposed / Amendment */}
+                  <div className="bg-[#0C1518] border border-emerald-900/40 rounded-lg p-3">
+                    <div className="flex items-center justify-between text-slate-400 text-[11px] mb-2 pb-1 border-b border-slate-800/80">
+                      <span className="text-emerald-400 flex items-center space-x-1 font-semibold">
+                        <span>+ Proposed Fact (Extracted Amendment)</span>
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-bold">Conf: {Math.round((c.proposed?.confidence || 0.95) * 100)}%</span>
+                    </div>
+                    <div className="text-emerald-200 bg-emerald-950/25 p-2 rounded border border-emerald-800/30 leading-relaxed break-words font-medium">
+                      {c.proposed?.value || 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Evidence Provenance */}
+                {c.proposed?.evidence && c.proposed.evidence.length > 0 && (
+                  <div className="text-xs bg-[#101524] p-2.5 rounded-lg border border-slate-800 text-slate-300 flex items-start space-x-2">
+                    <Quote className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-mono">Source Provenance Citation</span>
+                      <span className="text-slate-300 italic">{c.proposed.evidence[0]}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Bar */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs">
+                  <button
+                    onClick={() => setExpandedComments((p) => ({ ...p, [c.proposal_id]: !p[c.proposal_id] }))}
+                    className="text-slate-400 hover:text-slate-200 flex items-center space-x-1"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>{comments[c.proposal_id] ? 'Edit Reviewer Note' : 'Add Note'}</span>
+                  </button>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleAction(c.proposal_id, 'REJECTED')}
+                      disabled={actionLoading[c.proposal_id]}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center space-x-1 font-medium"
+                    >
+                      <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                      <span>Reject Amendment</span>
+                    </button>
+                    <button
+                      onClick={() => handleAction(c.proposal_id, 'APPROVED')}
+                      disabled={actionLoading[c.proposal_id]}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center space-x-1 font-semibold shadow-sm shadow-emerald-600/30"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Accept & Resolve Conflict</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Reviewer Note Drawer */}
+                {expandedComments[c.proposal_id] && (
+                  <div className="pt-2">
+                    <input
+                      type="text"
+                      placeholder="Attach reviewer comment or clinical justification..."
+                      value={comments[c.proposal_id] || ''}
+                      onChange={(e) => setComments({ ...comments, [c.proposal_id]: e.target.value })}
+                      className="w-full bg-[#161F32] border border-slate-700 text-xs text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Additions Section */}
+          {(filterType === 'all' || filterType === 'additions') && additions.map((a) => (
+            <div
+              key={a.proposal_id}
+              className="bg-[#0D121F] border border-slate-800 rounded-xl overflow-hidden shadow-sm transition hover:border-emerald-500/40"
+            >
+              {/* Card Header */}
+              <div className="bg-[#121828] px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="p-1 rounded bg-emerald-500/20 text-emerald-400">
+                    <Sparkles className="w-4 h-4 text-emerald-400" />
+                  </span>
+                  <div>
+                    <span className="text-xs font-semibold text-white tracking-wide">{a.title || 'New Knowledge Delta'}</span>
+                    <span className="ml-2 text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                      +{a.type || 'CLAIM'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-3 text-xs">
+                  <span className="text-emerald-400 font-mono text-[11px] font-semibold">
+                    {Math.round((a.confidence || 0.95) * 100)}% Confidence
+                  </span>
+                </div>
+              </div>
+
+              {/* Card Body */}
+              <div className="p-4 space-y-3">
+                <div className="bg-[#0C1518] border border-emerald-900/30 rounded-lg p-3">
+                  <div className="text-xs text-emerald-200 leading-relaxed font-mono">
+                    {a.proposed_value || a.summary || 'Extracted content'}
+                  </div>
+                </div>
+
+                {a.evidence && a.evidence.length > 0 && (
+                  <div className="text-xs bg-[#101524] p-2.5 rounded-lg border border-slate-800 text-slate-300 flex items-start space-x-2">
+                    <Quote className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-mono">Document Citation</span>
+                      <span className="text-slate-300 italic">{a.evidence[0]}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Bar */}
+                <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800/80 text-xs">
+                  <button
+                    onClick={() => handleAction(a.proposal_id, 'REJECTED')}
+                    disabled={actionLoading[a.proposal_id]}
+                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition font-medium"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    onClick={() => handleAction(a.proposal_id, 'APPROVED')}
+                    disabled={actionLoading[a.proposal_id]}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition font-semibold flex items-center space-x-1"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Approve Fact</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Changes / Updates Section */}
+          {(filterType === 'all' || filterType === 'changes') && changes.map((ch) => (
+            <div
+              key={ch.proposal_id}
+              className="bg-[#0D121F] border border-slate-800 rounded-xl overflow-hidden shadow-sm transition hover:border-blue-500/40"
+            >
+              <div className="bg-[#121828] px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <span className="p-1 rounded bg-blue-500/20 text-blue-400">
+                    <FileDiff className="w-4 h-4 text-blue-400" />
+                  </span>
+                  <span className="text-xs font-semibold text-white">{ch.title || 'Knowledge Update'}</span>
+                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">
+                    UPDATE
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="bg-[#141824] border border-slate-800 p-2.5 rounded text-slate-400">
+                    <div className="text-[10px] text-slate-500 mb-1">- Previous Value</div>
+                    <div>{ch.existing?.value || 'N/A'}</div>
+                  </div>
+                  <div className="bg-[#0C1518] border border-emerald-900/30 p-2.5 rounded text-emerald-300">
+                    <div className="text-[10px] text-emerald-400 mb-1">+ Updated Value</div>
+                    <div>{ch.proposed?.value || 'N/A'}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-800/80 text-xs">
+                  <button
+                    onClick={() => handleAction(ch.proposal_id, 'APPROVED')}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition"
+                  >
+                    Approve Update
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

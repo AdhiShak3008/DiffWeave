@@ -399,12 +399,18 @@ async def get_activity_feed_endpoint(
 # Static Studio UI Hosting (if built)
 # ---------------------------------------------------------------------------
 
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok", "service": "diffweave", "platform": "huggingface-space"}
+
+
 studio_dist_candidates = [
+    Path("/app/studio/dist"),
+    Path("studio/dist"),
     Path(__file__).parent.parent.parent / "studio" / "dist",
     Path(__file__).parent.parent / "studio" / "dist",
     Path("C:/Users/Adhi/Desktop/DiffWeave/studio/dist"),
 ]
-
 for dist_path in studio_dist_candidates:
     if dist_path.exists() and (dist_path / "index.html").exists():
         from fastapi.staticfiles import StaticFiles
@@ -414,4 +420,5 @@ for dist_path in studio_dist_candidates:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("diffweave.bridge.app:app", host="0.0.0.0", port=8000, reload=False)
+    port = int(os.environ.get("PORT", 7860))
+    uvicorn.run("diffweave.bridge.app:app", host="0.0.0.0", port=port, reload=False)

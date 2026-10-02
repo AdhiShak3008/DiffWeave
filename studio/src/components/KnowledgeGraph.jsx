@@ -1,175 +1,331 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import {
+  Network,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  ChevronRight,
+  Sparkles,
+  Link2,
+  FileText,
+  Info
+} from 'lucide-react';
 
 export default function KnowledgeGraph({ graphData, loading }) {
+  const [zoom, setZoom] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedNode, setSelectedNode] = useState(null);
+  const [filterType, setFilterType] = useState('ALL');
+
+  const rawNodes = graphData?.nodes || [];
+  const rawEdges = graphData?.edges || [];
+
+  // Filter nodes based on type and search query
+  const filteredNodes = useMemo(() => {
+    return rawNodes.filter((n) => {
+      const matchesType = filterType === 'ALL' || n.type === filterType;
+      const matchesSearch =
+        !searchQuery ||
+        n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(n.value || '').toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesType && matchesSearch;
+    });
+  }, [rawNodes, filterType, searchQuery]);
+
+  // Generate deterministic circular / force layout coordinates
+  const positionedNodes = useMemo(() => {
+    const total = filteredNodes.length;
+    if (total === 0) return [];
+
+    const centerX = 400;
+    const centerY = 300;
+    const radius = Math.min(centerX, centerY) - 80;
+
+    return filteredNodes.map((node, i) => {
+      // Golden angle distribution for natural cluster spread
+      const angle = (i * 2.399963) % (2 * Math.PI);
+      const r = 40 + (radius - 40) * Math.sqrt((i + 1) / total);
+      const x = centerX + r * Math.cos(angle);
+      const y = centerY + r * Math.sin(angle);
+      return { ...node, x, y };
+    });
+  }, [filteredNodes]);
+
+  const nodeMap = useMemo(() => {
+    const map = {};
+    positionedNodes.forEach((n) => {
+      map[n.id] = n;
+    });
+    return map;
+  }, [positionedNodes]);
+
+  const getNodeColor = (type) => {
+    switch (type) {
+      case 'ENTITY':
+        return '#06B6D4'; // Cyan
+      case 'CLAIM':
+        return '#8B5CF6'; // Violet
+      case 'METRIC':
+        return '#10B981'; // Emerald
+      case 'DATE':
+        return '#F59E0B'; // Amber
+      case 'PROPOSAL':
+        return '#EC4899'; // Pink
+      default:
+        return '#3B82F6'; // Blue
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-20 text-slate-400">
-        <span className="pulse-glow mr-3">⚙</span> Building knowledge graph topology...
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-xs text-slate-400 font-mono">Building Knowledge Topology Graph...</p>
       </div>
     );
   }
 
-  const nodes = graphData?.nodes || [];
-  const edges = graphData?.edges || [];
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between p-5 rounded-xl bg-[#0E1524] border border-slate-800">
-        <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span>Knowledge Graph & Provenance Topology</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
-              {nodes.length} Nodes · {edges.length} Links
-            </span>
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Visual map of semantic relationships and incoming PR conflict connections across documents.
-          </p>
+      {/* Graph Control Bar */}
+      <div className="bg-[#0C101A] border border-slate-800/90 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3">
+          <Network className="w-5 h-5 text-emerald-400" />
+          <h2 className="text-sm font-semibold text-white">Knowledge Graph Topology</h2>
+          <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+            {positionedNodes.length} nodes • {rawEdges.length} edges
+          </span>
+        </div>
+
+        <div className="flex items-center space-x-3 text-xs">
+          {/* Node Search Bar */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search graph..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-[#141B2D] border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 w-44"
+            />
+          </div>
+
+          {/* Type Filter */}
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="bg-[#141B2D] border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="ALL">All Types</option>
+            <option value="CLAIM">Claims</option>
+            <option value="METRIC">Metrics</option>
+            <option value="ENTITY">Entities</option>
+            <option value="PROPOSAL">Pending PRs</option>
+          </select>
+
+          {/* Zoom Controls */}
+          <div className="flex items-center bg-[#141B2D] border border-slate-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setZoom((z) => Math.min(z + 0.15, 2.0))}
+              className="p-1.5 hover:text-white text-slate-400 transition"
+              title="Zoom In"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setZoom((z) => Math.max(z - 0.15, 0.6))}
+              className="p-1.5 hover:text-white text-slate-400 transition"
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setZoom(1)}
+              className="p-1.5 hover:text-white text-slate-400 transition"
+              title="Reset Zoom"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Interactive Visual Graph Canvas */}
-        <div className="lg:col-span-2 rounded-xl border border-slate-800 bg-[#0C111E] p-6 min-h-[460px] flex flex-col justify-between relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800/80 pb-3">
-            <span className="font-mono">Topology Visualizer (SVG Canvas)</span>
-            <span className="text-[11px] text-slate-500">Click any node to inspect provenance</span>
+      {/* Main Canvas & Detail Drawer Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* SVG Canvas (8 Cols) */}
+        <div className="lg:col-span-8 bg-[#090D16] border border-slate-800/80 rounded-2xl p-4 overflow-hidden relative min-h-[560px] flex items-center justify-center">
+          {/* Interactive SVG */}
+          <svg
+            viewBox="0 0 800 600"
+            className="w-full h-full transition-transform duration-200 cursor-grab active:cursor-grabbing"
+            style={{ transform: `scale(${zoom})` }}
+          >
+            {/* Background Grid Pattern */}
+            <defs>
+              <pattern id="graphGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#161F32" strokeWidth="0.8" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#graphGrid)" />
+
+            {/* Edges */}
+            {rawEdges.map((edge, idx) => {
+              const src = nodeMap[edge.source];
+              const tgt = nodeMap[edge.target];
+              if (!src || !tgt) return null;
+
+              const isHighlighted = selectedNode && (selectedNode.id === src.id || selectedNode.id === tgt.id);
+
+              return (
+                <g key={edge.id || idx}>
+                  <line
+                    x1={src.x}
+                    y1={src.y}
+                    x2={tgt.x}
+                    y2={tgt.y}
+                    stroke={isHighlighted ? '#10B981' : '#334155'}
+                    strokeWidth={isHighlighted ? 2.5 : 1.2}
+                    strokeDasharray={edge.relationship === 'PROPOSED_UPDATE' ? '4 3' : 'none'}
+                    opacity={isHighlighted ? 0.9 : 0.4}
+                  />
+                </g>
+              );
+            })}
+
+            {/* Nodes */}
+            {positionedNodes.map((node) => {
+              const isSelected = selectedNode?.id === node.id;
+              const color = getNodeColor(node.type);
+
+              return (
+                <g
+                  key={node.id}
+                  transform={`translate(${node.x}, ${node.y})`}
+                  onClick={() => setSelectedNode(node)}
+                  className="cursor-pointer group"
+                >
+                  {/* Glow circle on select */}
+                  {isSelected && (
+                    <circle r="22" fill="none" stroke={color} strokeWidth="2.5" opacity="0.8" className="animate-pulse" />
+                  )}
+
+                  {/* Node Circle */}
+                  <circle
+                    r={node.type === 'PROPOSAL' ? 14 : 12}
+                    fill="#0D121F"
+                    stroke={color}
+                    strokeWidth={isSelected ? 3 : 2}
+                    strokeDasharray={node.type === 'PROPOSAL' ? '3 2' : 'none'}
+                    className="transition hover:scale-125"
+                  />
+
+                  {/* Inner Type Indicator Dot */}
+                  <circle r="4" fill={color} />
+
+                  {/* Node Label Text */}
+                  <text
+                    y="24"
+                    textAnchor="middle"
+                    fill={isSelected ? '#F8FAFC' : '#94A3B8'}
+                    fontSize="9.5"
+                    fontFamily="Inter, sans-serif"
+                    fontWeight={isSelected ? '600' : '400'}
+                    className="select-none pointer-events-none"
+                  >
+                    {node.title.length > 22 ? node.title.slice(0, 20) + '...' : node.title}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Color Legend Overlay */}
+          <div className="absolute bottom-4 left-4 bg-[#0E1422]/90 backdrop-blur-sm border border-slate-800 rounded-xl p-3 text-[11px] font-mono flex items-center space-x-3">
+            <span className="flex items-center space-x-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+              <span className="text-slate-300">Entity</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-violet-400"></span>
+              <span className="text-slate-300">Claim</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span className="text-slate-300">Metric</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-pink-400 border border-dashed border-pink-300"></span>
+              <span className="text-slate-300">PR Delta</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Selected Node Details Drawer (4 Cols) */}
+        <div className="lg:col-span-4 bg-[#0D121F] border border-slate-800 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center space-x-2 pb-3 border-b border-slate-800 text-xs text-slate-400">
+            <Info className="w-4 h-4 text-emerald-400" />
+            <span className="font-semibold text-white">Node Provenance Inspector</span>
           </div>
 
-          {nodes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center my-auto py-20 text-slate-500 text-xs">
-              <span>No knowledge entities or claims yet in this workspace.</span>
-              <span className="mt-1 text-[11px] text-slate-600">Stage files to extract graph nodes.</span>
-            </div>
-          ) : (
-            <div className="py-8 relative">
-              <div className="flex flex-wrap gap-4 items-center justify-center">
-                {nodes.map((n, idx) => {
-                  const isSelected = selectedNode?.id === n.id;
-                  const isProposal = n.type === 'PROPOSAL';
-                  const isContradiction = edges.some(
-                    (e) => (e.source === n.id || e.target === n.id) && e.relationship === 'CONTRADICTS'
-                  );
-
-                  let badgeColor = 'border-emerald-500/40 bg-emerald-950/20 text-emerald-300';
-                  if (isProposal) badgeColor = 'border-amber-500/50 bg-amber-950/30 text-amber-200';
-                  if (isContradiction) badgeColor = 'border-rose-500/60 bg-rose-950/30 text-rose-200 glow-crimson';
-
-                  return (
-                    <button
-                      key={n.id || idx}
-                      onClick={() => setSelectedNode(n)}
-                      className={`p-3 rounded-xl border text-left transition transform hover:scale-105 shadow-md max-w-xs ${badgeColor} ${
-                        isSelected ? 'ring-2 ring-cyan-400 scale-105' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-black/40">
-                          {n.type}
-                        </span>
-                        <span className="text-[10px] font-mono opacity-70">
-                          {(n.confidence * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-semibold text-white line-clamp-1">{n.title}</h4>
-                      {n.value && (
-                        <p className="text-[11px] text-slate-300 mt-1 line-clamp-2 opacity-80 font-mono">
-                          "{n.value}"
-                        </p>
-                      )}
-                    </button>
-                  );
-                })}
+          {selectedNode ? (
+            <div className="space-y-4 text-xs font-mono">
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Identifier</span>
+                <span className="text-slate-300 font-semibold">{selectedNode.id}</span>
               </div>
 
-              {/* Edge list summary */}
-              {edges.length > 0 && (
-                <div className="mt-8 pt-4 border-t border-slate-800/80">
-                  <h5 className="text-[11px] font-mono text-slate-400 mb-2">Active Semantic Links:</h5>
-                  <div className="flex flex-wrap gap-2">
-                    {edges.map((e, idx) => (
-                      <span
-                        key={idx}
-                        className={`text-[10px] font-mono px-2 py-1 rounded border ${
-                          e.relationship === 'CONTRADICTS'
-                            ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
-                            : 'bg-slate-800/80 border-slate-700 text-slate-300'
-                        }`}
-                      >
-                        {e.relationship} ({e.confidence || 1.0})
-                      </span>
-                    ))}
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Classification Type</span>
+                <span
+                  className="px-2 py-0.5 rounded text-[11px] font-bold"
+                  style={{
+                    backgroundColor: `${getNodeColor(selectedNode.type)}20`,
+                    color: getNodeColor(selectedNode.type),
+                    border: `1px solid ${getNodeColor(selectedNode.type)}40`,
+                  }}
+                >
+                  {selectedNode.type}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Fact Statement</span>
+                <div className="bg-[#141B2D] p-3 rounded-lg border border-slate-800 text-slate-200 leading-relaxed font-sans text-xs">
+                  {selectedNode.value || selectedNode.title}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                <div className="bg-[#141B2D] p-2 rounded border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">Confidence</span>
+                  <span className="text-emerald-400 font-bold">
+                    {Math.round((selectedNode.confidence || 0.95) * 100)}%
+                  </span>
+                </div>
+                <div className="bg-[#141B2D] p-2 rounded border border-slate-800">
+                  <span className="text-slate-500 block text-[10px]">State</span>
+                  <span className="text-slate-300 font-semibold">{selectedNode.status || 'ACTIVE'}</span>
+                </div>
+              </div>
+
+              {selectedNode.filename && (
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider block mb-1">Source Document</span>
+                  <div className="flex items-center space-x-1.5 text-slate-300 bg-[#141B2D] p-2 rounded border border-slate-800 text-[11px]">
+                    <FileText className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="truncate">{selectedNode.filename}</span>
                   </div>
                 </div>
               )}
             </div>
+          ) : (
+            <div className="py-16 text-center text-xs text-slate-500">
+              <Network className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+              <p>Click on any node in the topology canvas to inspect its semantic provenance and connected relationships.</p>
+            </div>
           )}
-
-          <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-800/80 pt-3">
-            <span>Legend: Green = Committed Truth · Amber = Proposed PR · Red = Collision</span>
-          </div>
-        </div>
-
-        {/* Selected Node Inspector */}
-        <div className="rounded-xl border border-slate-800 bg-[#0F1524] p-5 flex flex-col justify-between">
-          <div>
-            <h3 className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider mb-4">
-              Node Inspector
-            </h3>
-
-            {selectedNode ? (
-              <div className="space-y-4">
-                <div>
-                  <span className="text-[10px] font-mono text-cyan-400 uppercase block mb-1">
-                    {selectedNode.type}
-                  </span>
-                  <h4 className="text-sm font-bold text-white">{selectedNode.title}</h4>
-                </div>
-
-                {selectedNode.value && (
-                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-slate-500 block mb-1 font-mono">Registered Value:</span>
-                    <p className="text-xs text-slate-200 font-mono">"{selectedNode.value}"</p>
-                  </div>
-                )}
-
-                {selectedNode.summary && (
-                  <div>
-                    <span className="text-[10px] text-slate-500 block mb-1 font-mono">Summary:</span>
-                    <p className="text-xs text-slate-300 leading-relaxed">{selectedNode.summary}</p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                  <div className="p-2 rounded bg-slate-900/60 border border-slate-800">
-                    <span className="text-slate-500 block">Status:</span>
-                    <span className="text-emerald-400 font-semibold">{selectedNode.status || 'ACTIVE'}</span>
-                  </div>
-                  <div className="p-2 rounded bg-slate-900/60 border border-slate-800">
-                    <span className="text-slate-500 block">Confidence:</span>
-                    <span className="text-amber-300 font-semibold">
-                      {(selectedNode.confidence * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                </div>
-
-                {selectedNode.filename && (
-                  <div>
-                    <span className="text-[10px] text-slate-500 block mb-1 font-mono">Source Document:</span>
-                    <span className="text-xs text-slate-300 font-mono bg-slate-800 px-2 py-1 rounded">
-                      {selectedNode.filename}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="py-20 text-center text-slate-500 text-xs">
-                Select any node on the graph to inspect its properties, evidence, and provenance links.
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
