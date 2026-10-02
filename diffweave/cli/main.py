@@ -20,6 +20,7 @@ from diffweave.cli.commands.log_cmd import log_command
 from diffweave.cli.commands.search_cmd import search_command
 from diffweave.cli.commands.doctor_cmd import doctor_command
 from diffweave.cli.commands.rules_cmd import rules_app
+from diffweave.cli.commands.auth_cmd import login_command, logout_command, whoami_command
 
 console = Console()
 
@@ -32,6 +33,9 @@ app = typer.Typer(
 
 # Register top-level commands
 app.command(name="init", help="Initialize a DiffWeave workspace (.diffweave/)")(init_command)
+app.command(name="login", help="Authenticate with DocWeave via email/password, demo, or API token")(login_command)
+app.command(name="logout", help="Log out and remove stored credentials")(logout_command)
+app.command(name="whoami", help="Display current authenticated user identity and workspace")(whoami_command)
 app.command(name="add", help="Stage and ingest documents into workspace")(add_command)
 app.command(name="status", help="Show workspace state, document staging, and pending reviews")(status_command)
 app.command(name="proposals", help="List and inspect extracted knowledge proposals (PRs)")(proposals_command)

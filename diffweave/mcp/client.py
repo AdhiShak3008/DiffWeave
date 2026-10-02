@@ -3,8 +3,7 @@ DiffWeave MCP Client Adapter.
 
 Provides a unified, resilient interface to DocWeave's MCP services.
 Supports:
-1. Remote HTTP/SSE MCP transport (via DOCWEAVE_MCP_URL + DOCWEAVE_API_KEY)
-   -> Use this when DiffWeave is deployed to the web!
+1. Remote HTTP/SSE MCP transport (via DOCWEAVE_MCP_URL + DOCWEAVE_API_KEY or ~/.diffweave/credentials.json).
 2. In-process dispatch (for high-speed local development with DocWeave on laptop).
 3. Embedded standalone engine (offline / fallback mode).
 """
@@ -35,6 +34,18 @@ class DiffWeaveMCPClient:
         self.api_key = api_key or os.environ.get("DOCWEAVE_API_KEY")
         self.backend_dir = None
         self._standalone_engine = None
+
+        # Auto-resolve from ~/.diffweave/credentials.json if available
+        try:
+            from diffweave.cli.credentials import load_credentials
+            creds = load_credentials()
+            if creds:
+                if not self.api_key and creds.get("access_token"):
+                    self.api_key = creds.get("access_token")
+                if not self.mcp_url and creds.get("mcp_url"):
+                    self.mcp_url = creds.get("mcp_url")
+        except Exception:
+            pass
 
         if self.mcp_url:
             # Production remote cloud mode (e.g., https://your-docweave.hf.space)
