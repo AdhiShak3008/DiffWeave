@@ -3,9 +3,10 @@ DiffWeave MCP Client Adapter.
 
 Provides a unified, resilient interface to DocWeave's MCP services.
 Supports:
-1. In-process dispatch (for high-speed local development with DocWeave).
-2. Remote HTTP/SSE transport (via DOCWEAVE_MCP_URL).
-3. Embedded standalone engine (runs independently if DocWeave is not present).
+1. Remote HTTP/SSE MCP transport (via DOCWEAVE_MCP_URL + DOCWEAVE_API_KEY)
+   -> Use this when DiffWeave is deployed to the web!
+2. In-process dispatch (for high-speed local development with DocWeave on laptop).
+3. Embedded standalone engine (offline / fallback mode).
 """
 from __future__ import annotations
 
@@ -21,19 +22,26 @@ from diffweave.mcp.errors import MCPConnectionError, MCPToolError
 
 class DiffWeaveMCPClient:
     """
-    Client for interacting with DocWeave MCP services or embedded fallback.
+    Client for interacting with DocWeave MCP services (remote or local).
     """
 
-    def __init__(self, backend_dir: Optional[str] = None, mcp_url: Optional[str] = None):
+    def __init__(
+        self,
+        backend_dir: Optional[str] = None,
+        mcp_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+    ):
         self.mcp_url = mcp_url or os.environ.get("DOCWEAVE_MCP_URL")
+        self.api_key = api_key or os.environ.get("DOCWEAVE_API_KEY")
         self.backend_dir = None
         self._standalone_engine = None
 
         if self.mcp_url:
-            # Remote MCP server mode
+            # Production remote cloud mode (e.g., https://your-docweave.hf.space)
             self.mode = "remote"
             return
 
+        # Local development check
         if backend_dir:
             cand = Path(backend_dir).resolve()
             if cand.exists():
@@ -73,19 +81,32 @@ class DiffWeaveMCPClient:
         if self._standalone_engine:
             return await self._standalone_engine.dispatch(name, arguments)
 
-        # 2. Remote HTTP MCP Transport
+        # 2. Remote Cloud MCP Transport (Production Deployed)
         if self.mcp_url:
             import httpx
-            async with httpx.AsyncClient(timeout=60.0) as http_client:
+            headers = {"Content-Type": "application/json"}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+
+            async with httpx.AsyncClient(timeout=120.0) as http_client:
+                # Try standard FastMCP endpoint
+                endpoint = f"{self.mcp_url.rstrip('/')}/tools/{name}"
                 try:
-                    resp = await http_client.post(
-                        f"{self.mcp_url.rstrip('/')}/tools/{name}",
-                        json={"arguments": arguments},
-                    )
+                    resp = await http_client.post(endpoint, json={"arguments": arguments}, headers=headers)
+                    if resp.status_code == 404:
+                        # Fallback to standard JSON-RPC 2.0 endpoint
+                        rpc_payload = {
+                            "jsonrpc": "2.0",
+                            "id": "diffweave-1",
+                            "method": "tools/call",
+                            "params": {"name": name, "arguments": arguments},
+                        }
+                        resp = await http_client.post(self.mcp_url.rstrip('/'), json=rpc_payload, headers=headers)
                     resp.raise_for_status()
-                    return resp.json()
+                    data = resp.json()
+                    return data.get("result", data)
                 except Exception as e:
-                    raise MCPToolError(tool_name=name, message=f"Remote MCP request failed: {e}")
+                    raise MCPToolError(tool_name=name, message=f"Remote DocWeave MCP call failed: {e}")
 
         # 3. In-process dispatch with local DocWeave
         backend_str = str(self.backend_dir)
@@ -95,7 +116,6 @@ class DiffWeaveMCPClient:
         try:
             from mcp_server import _dispatch, get_db, _get_current_user
         except ImportError as e:
-            # Fall back to standalone engine if import fails
             from diffweave.mcp.standalone_engine import StandaloneEngine
             self._standalone_engine = StandaloneEngine()
             return await self._standalone_engine.dispatch(name, arguments)
