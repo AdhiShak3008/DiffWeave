@@ -23,6 +23,10 @@
       "destination": "/.well-known/assetlinks.json"
     },
     {
+      "source": "/api/:path*",
+      "destination": "https://shak3008-diffweave.hf.space/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

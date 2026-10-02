@@ -1,3 +1,4 @@
+import { API_BASE } from "../../api/client.js";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthLayout } from "../../components/AuthLayout.jsx";
@@ -42,7 +43,7 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/send-otp", {
+      const res = await fetch(`${API_BASE}/auth/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, email, password }),
@@ -64,7 +65,7 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/verify-otp", {
+      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: otpCode }),
@@ -83,7 +84,7 @@ export default function Signup() {
     setError(null);
     setDemoLoading(true);
     try {
-      const res = await fetch("/api/auth/demo-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const res = await fetch(`${API_BASE}/auth/demo-login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const data = await res.json();
       if (!res.ok || !data.access_token) { setError(data.detail || "Could not start demo session."); return; }
       login(data.access_token, { email: data.email, username: data.username });

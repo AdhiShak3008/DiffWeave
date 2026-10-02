@@ -1,3 +1,4 @@
+import { API_BASE } from "../../api/client.js";
 ﻿import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AuthLayout } from "../../components/AuthLayout.jsx";
@@ -13,7 +14,7 @@ export default function ForgotPassword() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/forgot-password", {
+      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

@@ -1,3 +1,4 @@
+import { API_BASE } from "../../api/client.js";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AuthLayout } from "../../components/AuthLayout.jsx";
@@ -31,7 +32,7 @@ export default function Login() {
       const formData = new URLSearchParams();
       formData.append("username", email);
       formData.append("password", password);
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: formData.toString(),
@@ -57,7 +58,7 @@ export default function Login() {
     setError(null);
     setDemoLoading(true);
     try {
-      const res = await fetch("/api/auth/demo-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const res = await fetch(`${API_BASE}/auth/demo-login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       const data = await res.json();
       if (!res.ok || !data.access_token) {
         setError(data.detail || "Could not start demo session.");

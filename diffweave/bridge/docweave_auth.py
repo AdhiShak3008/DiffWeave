@@ -42,10 +42,16 @@ _otp_store: dict[str, dict] = {}
 _reset_tokens: dict[str, dict] = {}
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    pw_bytes = password.encode("utf-8")[:72]
+    return pwd_context.hash(pw_bytes.decode("utf-8", errors="ignore"))
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        pw_bytes = plain_password.encode("utf-8")[:72]
+        return pwd_context.verify(pw_bytes.decode("utf-8", errors="ignore"), hashed_password)
+    except Exception as e:
+        logger.warning(f"Password verification error: {e}")
+        return False
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     to_encode = data.copy()

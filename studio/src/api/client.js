@@ -4,7 +4,19 @@
  * Supports Bearer token authentication and user sessions.
  */
 
-const API_BASE = '/api';
+export const CLOUD_BACKEND_URL = 'https://shak3008-diffweave.hf.space';
+
+export function getApiBase() {
+  if (typeof window !== 'undefined') {
+    // If running on Vercel or any external static preview, route to HF Space backend
+    if (window.location.hostname.includes('vercel.app')) {
+      return `${CLOUD_BACKEND_URL}/api`;
+    }
+  }
+  return '/api';
+}
+
+export const API_BASE = getApiBase();
 
 function getHeaders(custom = {}) {
   const token = localStorage.getItem('diffweave_token');
