@@ -19,13 +19,17 @@ import {
   Cpu,
   Plus,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Terminal,
+  Grid,
+  ArrowLeft
 } from 'lucide-react';
 
 export default function Navbar({
   workspaces,
   currentWorkspace,
   onSelectWorkspace,
+  onOpenHub,
   onCreateWorkspace,
   activeTab,
   onSelectTab,
@@ -43,23 +47,6 @@ export default function Navbar({
 
   const wsDropdownRef = useRef(null);
   const userDropdownRef = useRef(null);
-  const searchInputRef = useRef(null);
-
-  // Keyboard shortcut '/' to focus global search
-  useEffect(() => {
-    function handleKeyDown(e) {
-      if (e.key === '/' && document.activeElement !== searchInputRef.current && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
-        if (onSearchChange) onSearchChange('');
-        searchInputRef.current?.blur();
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onSearchChange]);
 
   // Close dropdowns when clicking anywhere outside
   useEffect(() => {
@@ -88,8 +75,8 @@ export default function Navbar({
     setShowCreateModal(false);
   };
 
-  const totalDocs = stats?.total_documents ?? 0;
-  const verifiedFacts = stats?.knowledge_items ?? stats?.total_knowledge_items ?? 0;
+  const totalDocs = stats?.total_documents ?? currentWorkspace?.d_count ?? 0;
+  const verifiedFacts = stats?.knowledge_items ?? stats?.total_knowledge_items ?? currentWorkspace?.k_count ?? 0;
   const pendingProposals = stats?.pending_proposals ?? 0;
 
   const tabs = [
@@ -100,21 +87,23 @@ export default function Navbar({
     { id: 'rules', label: 'Policy CI Rules', icon: ShieldCheck },
     { id: 'knowledge', label: 'Master Truth Register', icon: Database, badge: verifiedFacts > 0 ? `${verifiedFacts}` : undefined },
     { id: 'audit', label: 'Audit Trail', icon: History },
+    { id: 'quickstart', label: 'CLI Quickstart', icon: Terminal },
     { id: 'auth', label: 'API Keys & Auth', icon: Key, badge: currentUser ? 'Active' : 'DocWeave' },
   ];
 
   return (
     <header className="w-full bg-[#0D1117] border-b border-[#30363D] text-slate-100 select-none">
       {/* --------------------------------------------------------------------- */}
-      {/* TIER 1: Global Platform Bar (#010409) */}
+      {/* TIER 1: Global Platform Bar (#010409)                                 */}
       {/* --------------------------------------------------------------------- */}
       <div className="bg-[#010409] border-b border-[#30363D] px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs">
         {/* Left: Brand & Workspace Selector */}
         <div className="flex items-center space-x-3">
-          {/* DiffWeave Logo */}
+          {/* DiffWeave Logo (Navigates to Hub) */}
           <div
-            onClick={() => onSelectTab('diff')}
+            onClick={onOpenHub}
             className="flex items-center space-x-2.5 cursor-pointer group"
+            title="Return to Workspaces Hub"
           >
             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 via-teal-500 to-sky-500 p-0.5 shadow-md group-hover:scale-105 transition">
               <div className="w-full h-full bg-[#010409] rounded-[6px] flex items-center justify-center">
@@ -133,6 +122,19 @@ export default function Navbar({
 
           <span className="text-slate-600 hidden sm:inline">/</span>
 
+          {/* Hub Button */}
+          <button
+            onClick={onOpenHub}
+            className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold transition ${
+              !currentWorkspace
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-[#161B22] hover:bg-[#21262D] border-[#30363D] text-slate-300 hover:text-white'
+            }`}
+          >
+            <Grid className="w-3.5 h-3.5" />
+            <span>Workspaces</span>
+          </button>
+
           {/* Workspace Dropdown */}
           <div ref={wsDropdownRef} className="relative">
             <button
@@ -142,47 +144,65 @@ export default function Navbar({
               }}
               className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-200 transition font-medium"
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="truncate max-w-[150px] text-xs">
-                {currentWorkspace?.name || 'Default Workspace'}
+              <span className={`w-2 h-2 rounded-full ${currentWorkspace ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+              <span className="truncate max-w-[150px] text-xs font-semibold">
+                {currentWorkspace ? currentWorkspace.name : 'Select Workspace'}
               </span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
             {showWsDropdown && (
-              <div className="absolute left-0 mt-1.5 w-64 bg-[#161B22] border border-[#30363D] rounded-lg shadow-2xl p-2 z-40 space-y-1">
-                <div className="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider">
-                  Knowledge Workspaces
+              <div className="absolute left-0 mt-1.5 w-64 bg-[#161B22] border border-[#30363D] rounded-xl shadow-2xl p-2 z-50 space-y-1">
+                {/* Option to go to Hub */}
+                <button
+                  onClick={() => {
+                    onOpenHub();
+                    setShowWsDropdown(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center space-x-2 text-emerald-400 hover:bg-[#21262D] font-bold pb-2 border-b border-[#30363D]"
+                >
+                  <Grid className="w-3.5 h-3.5" />
+                  <span>View All Workspaces (Hub)</span>
+                </button>
+
+                <div className="text-[10px] font-bold text-slate-400 px-2 pt-2 pb-1 uppercase tracking-wider">
+                  Workspaces ({workspaces.length})
                 </div>
-                {workspaces.map((w) => (
-                  <button
-                    key={w.id}
-                    onClick={() => {
-                      onSelectWorkspace(w.id);
-                      setShowWsDropdown(false);
-                    }}
-                    className={`w-full text-left px-2 py-1.5 rounded text-xs transition flex items-center justify-between ${
-                      currentWorkspace?.id === w.id
-                        ? 'bg-emerald-500/20 text-emerald-300 font-bold'
-                        : 'text-slate-300 hover:bg-[#21262D]'
-                    }`}
-                  >
-                    <div className="flex flex-col truncate pr-2">
-                      <span className="truncate font-semibold">{w.name}</span>
-                      {w.description && (
-                        <span className="text-[10px] text-slate-400 font-normal truncate">{w.description}</span>
+
+                <div className="max-h-60 overflow-y-auto space-y-0.5">
+                  {workspaces.map((w) => (
+                    <button
+                      key={w.id}
+                      onClick={() => {
+                        onSelectWorkspace(w);
+                        setShowWsDropdown(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded text-xs transition flex items-center justify-between ${
+                        currentWorkspace?.id === w.id
+                          ? 'bg-emerald-500/20 text-emerald-300 font-bold'
+                          : 'text-slate-300 hover:bg-[#21262D]'
+                      }`}
+                    >
+                      <div className="flex flex-col truncate pr-2">
+                        <span className="truncate font-semibold">{w.name}</span>
+                        <span className="text-[10px] text-slate-400 font-normal truncate">
+                          {w.d_count ?? 0} docs · {w.k_count ?? 0} facts
+                        </span>
+                      </div>
+                      {currentWorkspace?.id === w.id && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       )}
-                    </div>
-                    {currentWorkspace?.id === w.id && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                  </button>
-                ))}
-                <div className="pt-1 border-t border-[#30363D]">
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-1.5 border-t border-[#30363D]">
                   <button
                     onClick={() => {
                       setShowWsDropdown(false);
                       setShowCreateModal(true);
                     }}
-                    className="w-full text-left px-2 py-1.5 rounded text-xs text-sky-400 hover:bg-[#21262D] font-semibold flex items-center space-x-1"
+                    className="w-full text-left px-2 py-1.5 rounded text-xs text-sky-400 hover:bg-[#21262D] font-semibold flex items-center space-x-1.5"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>New Document Workspace...</span>
@@ -193,55 +213,16 @@ export default function Navbar({
           </div>
         </div>
 
-        {/* Center: Global Search */}
-        <div className="hidden md:flex items-center flex-1 max-w-sm mx-6">
-          <div className="w-full relative flex items-center">
-            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3" />
-            <input
-              type="text"
-              readOnly
-              onClick={() => onSelectTab('knowledge')}
-              placeholder="Search claims, policies, documents, rules... (press /)"
-              className="w-full pl-8 pr-8 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-[11px] text-slate-300 placeholder-slate-500 cursor-pointer transition focus:outline-none"
-            />
-            <span className="absolute right-2 text-[10px] font-mono text-slate-500 bg-[#0D1117] border border-[#30363D] px-1.5 py-0.5 rounded">
-              /
-            </span>
-          </div>
-        </div>
-
-        {/* Right: FastMCP Status & Identity */}
+        {/* Right: FastMCP Bridge status & User Profile */}
         <div className="flex items-center space-x-3">
-          {/* FastMCP Pill */}
-          <div className="hidden lg:flex items-center space-x-1.5 px-2.5 py-0.8 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[11px]">
-            <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-            <span>FastMCP: 29 Tools Active (14ms)</span>
+          {/* FastMCP Connected Pill */}
+          <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#161B22] border border-[#30363D] text-[11px] text-slate-400 font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <Cpu className="w-3 h-3 text-emerald-400" />
+            <span>FastMCP: Active</span>
           </div>
 
-          {/* DocWeave Portal Link */}
-          <a
-            href="http://localhost:5173"
-            target="_blank"
-            rel="noreferrer"
-            className="hidden sm:flex items-center space-x-1 text-slate-400 hover:text-white transition px-2 py-1 rounded hover:bg-[#161B22]"
-            title="Open DocWeave Web App"
-          >
-            <span>DocWeave Portal</span>
-            <ExternalLink className="w-3 h-3" />
-          </a>
-
-          {/* Sync Button */}
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              className="p-1.5 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white transition"
-              title="Sync Workspace with FastMCP"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-emerald-400' : ''}`} />
-            </button>
-          )}
-
-          {/* User Profile / Auth Button */}
+          {/* User Menu */}
           {currentUser ? (
             <div ref={userDropdownRef} className="relative">
               <button
@@ -261,11 +242,21 @@ export default function Navbar({
               </button>
 
               {showUserDropdown && (
-                <div className="absolute right-0 mt-1.5 w-56 bg-[#161B22] border border-[#30363D] rounded-lg shadow-2xl p-2 z-40 space-y-1 text-xs">
+                <div className="absolute right-0 mt-1.5 w-56 bg-[#161B22] border border-[#30363D] rounded-xl shadow-2xl p-2 z-50 space-y-1 text-xs">
                   <div className="px-2 py-1.5 border-b border-[#30363D]">
                     <p className="font-bold text-white">{currentUser.username || 'User'}</p>
                     <p className="text-[11px] text-slate-400 font-mono truncate">{currentUser.email || 'user@docweave.io'}</p>
                   </div>
+                  <button
+                    onClick={() => {
+                      setShowUserDropdown(false);
+                      onOpenHub();
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded text-slate-300 hover:bg-[#21262D] flex items-center space-x-2"
+                  >
+                    <Grid className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Workspaces Hub</span>
+                  </button>
                   <button
                     onClick={() => {
                       setShowUserDropdown(false);
@@ -302,80 +293,91 @@ export default function Navbar({
       </div>
 
       {/* --------------------------------------------------------------------- */}
-      {/* TIER 2: Workspace Document Context Header (#0D1117) */}
+      {/* TIER 2: Workspace Document Context Header (#0D1117) - If Workspace Active */}
       {/* --------------------------------------------------------------------- */}
-      <div className="px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Workspace Title & Badge */}
-        <div className="flex items-center space-x-2.5">
-          <Files className="w-5 h-5 text-emerald-400" />
-          <div className="flex items-center space-x-2">
-            <span className="text-white font-bold text-base sm:text-lg">
-              {currentWorkspace?.name || 'Enterprise Policy & Knowledge Base'}
-            </span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
-              Deterministic RAG
-            </span>
-          </div>
-        </div>
+      {currentWorkspace && (
+        <>
+          <div className="px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Workspace Title & Badge */}
+            <div className="flex items-center space-x-2.5">
+              <button
+                onClick={onOpenHub}
+                className="p-1 rounded-md hover:bg-[#161B22] text-slate-400 hover:text-white transition"
+                title="Back to All Workspaces"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <Files className="w-5 h-5 text-emerald-400" />
+              <div className="flex items-center space-x-2">
+                <span className="text-white font-bold text-base sm:text-lg">
+                  {currentWorkspace?.name}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+                  Deterministic RAG
+                </span>
+              </div>
+            </div>
 
-        {/* Real Document Platform KPI Badges */}
-        <div className="flex items-center space-x-2 text-xs font-semibold">
-          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
-            <Files className="w-3.5 h-3.5 text-sky-400" />
-            <span>Tracked Docs:</span>
-            <span className="text-white font-bold font-mono">{totalDocs}</span>
+            {/* Real Document Platform KPI Badges */}
+            <div className="flex items-center space-x-2 text-xs font-semibold">
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
+                <Files className="w-3.5 h-3.5 text-sky-400" />
+                <span>Tracked Docs:</span>
+                <span className="text-white font-bold font-mono">{totalDocs}</span>
+              </div>
+
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Verified Truth:</span>
+                <span className="text-white font-bold font-mono">{verifiedFacts} Facts</span>
+              </div>
+
+              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
+                <GitPullRequest className="w-3.5 h-3.5 text-amber-400" />
+                <span>Pending PRs:</span>
+                <span className="text-amber-400 font-bold font-mono">{pendingProposals}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
-            <Database className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Verified Truth:</span>
-            <span className="text-white font-bold font-mono">{verifiedFacts} Facts</span>
-          </div>
-
-          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
-            <GitPullRequest className="w-3.5 h-3.5 text-amber-400" />
-            <span>Pending PRs:</span>
-            <span className="text-amber-400 font-bold font-mono">{pendingProposals}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* --------------------------------------------------------------------- */}
-      {/* TIER 3: Knowledge Git Tabs */}
-      {/* --------------------------------------------------------------------- */}
-      <nav className="px-4 sm:px-6 flex space-x-1 overflow-x-auto text-xs font-semibold no-scrollbar">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => onSelectTab(tab.id)}
-              className={`flex items-center space-x-2 px-3.5 py-2.5 border-b-2 transition whitespace-nowrap ${
-                isActive
-                  ? 'border-emerald-500 text-white font-bold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
-              }`}
-            >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-500'}`} />
-              <span>{tab.label}</span>
-              {tab.badge && (
-                <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+          {/* ----------------------------------------------------------------- */}
+          {/* TIER 3: Knowledge Git Tabs                                       */}
+          {/* ----------------------------------------------------------------- */}
+          <nav className="px-4 sm:px-6 flex space-x-1 overflow-x-auto text-xs font-semibold no-scrollbar">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => onSelectTab(tab.id)}
+                  className={`flex items-center space-x-2 px-3.5 py-2.5 border-b-2 transition whitespace-nowrap ${
                     isActive
-                      ? 'bg-emerald-500/20 text-emerald-300 font-bold'
-                      : 'bg-[#21262D] text-slate-400'
+                      ? 'border-emerald-500 text-white font-bold'
+                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
                   }`}
                 >
-                  {tab.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </nav>
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-500'}`} />
+                  <span>{tab.label}</span>
+                  {tab.badge && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                        isActive
+                          ? 'bg-emerald-500/20 text-emerald-300 font-bold'
+                          : 'bg-[#21262D] text-slate-400'
+                      }`}
+                    >
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </>
+      )}
 
-      {/* Create Workspace Modal */}
+      {/* Fallback Simple Modal if triggered from dropdown */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#161B22] border border-[#30363D] rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
