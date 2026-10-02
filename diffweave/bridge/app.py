@@ -74,6 +74,7 @@ import json as _json
 from fastapi import Request as _Request, Header
 from fastapi.responses import Response as _Response
 from diffweave.bridge import docweave_auth
+from diffweave.bridge import db_store
 from diffweave.cli.credentials import save_credentials, clear_credentials
 
 _DOCWEAVE_URL = os.environ.get("DOCWEAVE_BACKEND_URL", "http://localhost:8000")
@@ -319,14 +320,28 @@ async def get_workspace_status(workspace_id: str):
         stats = await client.get_dashboard_stats(workspace_id)
         docs = await client.list_documents(workspace_id)
         pending = await client.list_pending_proposals(workspace_id)
+        if not stats or (stats.get("total_documents", 0) == 0 and stats.get("knowledge_items", 0) == 0):
+            db_status = db_store.get_db_workspace_status(workspace_id)
+            if db_status.get("knowledge_items", 0) > 0 or db_status.get("total_documents", 0) > 0:
+                stats = db_status
+                docs = db_store.get_db_documents(workspace_id)
+                pending = db_store.get_db_proposals(workspace_id, status="PENDING")
         return {
             "workspace_id": workspace_id,
             "stats": stats,
             "documents": docs,
             "pending_proposals": pending,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        db_status = db_store.get_db_workspace_status(workspace_id)
+        docs = db_store.get_db_documents(workspace_id)
+        pending = db_store.get_db_proposals(workspace_id, status="PENDING")
+        return {
+            "workspace_id": workspace_id,
+            "stats": db_status,
+            "documents": docs,
+            "pending_proposals": pending,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -336,9 +351,12 @@ async def get_workspace_status(workspace_id: str):
 @app.get("/api/workspaces/{workspace_id}/documents")
 async def get_documents(workspace_id: str):
     try:
-        return await client.list_documents(workspace_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        docs = await client.list_documents(workspace_id)
+        if not docs:
+            docs = db_store.get_db_documents(workspace_id)
+        return docs
+    except Exception:
+        return db_store.get_db_documents(workspace_id)
 
 
 @app.post("/api/workspaces/{workspace_id}/upload")
@@ -394,9 +412,12 @@ async def get_proposals(
     document_version_id: Optional[str] = Query(None),
 ):
     try:
-        return await client.list_pending_proposals(workspace_id, document_version_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        props = await client.list_pending_proposals(workspace_id, document_version_id)
+        if not props:
+            props = db_store.get_db_proposals(workspace_id)
+        return props
+    except Exception:
+        return db_store.get_db_proposals(workspace_id)
 
 
 @app.post("/api/workspaces/{workspace_id}/proposals/{proposal_id}/review")
@@ -448,9 +469,12 @@ async def get_semantic_diff_endpoint(
     document_version_id: Optional[str] = Query(None),
 ):
     try:
-        return await client.get_semantic_diff(workspace_id, proposal_id, document_version_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        diff_data = await client.get_semantic_diff(workspace_id, proposal_id, document_version_id)
+        if not diff_data or (not diff_data.get("additions") and not diff_data.get("modifications") and not diff_data.get("unchanged")):
+            diff_data = db_store.get_db_semantic_diff(workspace_id)
+        return diff_data
+    except Exception:
+        return db_store.get_db_semantic_diff(workspace_id)
 
 
 @app.get("/api/workspaces/{workspace_id}/validate")
@@ -471,9 +495,12 @@ async def get_validation_endpoint(
 @app.get("/api/workspaces/{workspace_id}/graph")
 async def get_knowledge_graph_endpoint(workspace_id: str):
     try:
-        return await client.get_knowledge_graph(workspace_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        graph = await client.get_knowledge_graph(workspace_id)
+        if not graph or not graph.get("nodes"):
+            graph = db_store.get_db_knowledge_graph(workspace_id)
+        return graph
+    except Exception:
+        return db_store.get_db_knowledge_graph(workspace_id)
 
 
 @app.get("/api/workspaces/{workspace_id}/knowledge")
@@ -483,9 +510,12 @@ async def get_knowledge_endpoint(
     status: Optional[str] = Query(None),
 ):
     try:
-        return await client.list_knowledge(workspace_id, type=type, status=status)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        items = await client.list_knowledge(workspace_id, type=type, status=status)
+        if not items:
+            items = db_store.get_db_knowledge_items(workspace_id, type=type, status=status)
+        return items
+    except Exception:
+        return db_store.get_db_knowledge_items(workspace_id, type=type, status=status)
 
 
 @app.get("/api/knowledge/{item_id}")
@@ -514,9 +544,12 @@ async def search_knowledge_endpoint(
 @app.get("/api/workspaces/{workspace_id}/rules")
 async def get_rules_endpoint(workspace_id: str):
     try:
-        return await client.list_rules(workspace_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        rules = await client.list_rules(workspace_id)
+        if not rules:
+            rules = db_store.get_db_rules(workspace_id)
+        return rules
+    except Exception:
+        return db_store.get_db_rules(workspace_id)
 
 
 @app.post("/api/workspaces/{workspace_id}/rules")
