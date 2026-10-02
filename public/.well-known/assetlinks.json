@@ -1,0 +1,47 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "web",
+      "site": "https://www.doc-weave.xyz"
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "web",
+      "site": "https://doc-weave.xyz"
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "web",
+      "site": "https://doc-weave.vercel.app"
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "web",
+      "site": "https://diff-weave.vercel.app"
+    }
+  },
+  {
+    "relation": [
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "web",
+      "site": "https://shak3008-diffweave.hf.space"
+    }
+  }
+]

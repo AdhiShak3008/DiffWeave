@@ -609,6 +609,46 @@ async def get_activity_feed_endpoint(
 async def healthz():
     return {"status": "ok", "service": "diffweave", "platform": "huggingface-space"}
 
+@app.get("/.well-known/assetlinks.json")
+async def get_assetlinks():
+    return [
+        {
+            "relation": ["delegate_permission/common.get_login_creds"],
+            "target": {
+                "namespace": "web",
+                "site": "https://www.doc-weave.xyz"
+            }
+        },
+        {
+            "relation": ["delegate_permission/common.get_login_creds"],
+            "target": {
+                "namespace": "web",
+                "site": "https://doc-weave.xyz"
+            }
+        },
+        {
+            "relation": ["delegate_permission/common.get_login_creds"],
+            "target": {
+                "namespace": "web",
+                "site": "https://doc-weave.vercel.app"
+            }
+        },
+        {
+            "relation": ["delegate_permission/common.get_login_creds"],
+            "target": {
+                "namespace": "web",
+                "site": "https://diff-weave.vercel.app"
+            }
+        },
+        {
+            "relation": ["delegate_permission/common.get_login_creds"],
+            "target": {
+                "namespace": "web",
+                "site": "https://shak3008-diffweave.hf.space"
+            }
+        }
+    ]
+
 studio_dist_candidates = [
     Path("/app/studio/dist"),
     Path("studio/dist"),
