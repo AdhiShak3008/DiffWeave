@@ -1,0 +1,3 @@
+"""
+DiffWeave CLI package.
+"""

@@ -1,0 +1,18 @@
+CLINICAL TRIAL PROTOCOL AMENDMENT: CARDIOVASCULAR REPAIR
+=============================================================
+Protocol ID: PROTOCOL-CR-2026-01-AMD1
+Sponsor: Global BioHealth Institute
+Amendment Effective Date: August 15, 2026
+Reference: Protocol PROTOCOL-CR-2026-01 dated February 1, 2026
+
+This Amendment formally updates and revises the clinical trial parameters:
+
+1. REVISED PATIENT ENROLLMENT
+- Total Planned Enrollment: Enrollment is expanded from 1,200 patients to a total of 1,800 adult patients to increase statistical power across 50 international sites.
+- Target Patient Age: Revised to adults aged 60 years or older (expanded from previous 65+ cutoff).
+
+2. UPDATED DOSAGE AND MEDICATION REGIMEN
+- Post-Operative Anticoagulation: Patients will now receive direct oral anticoagulants (Apixaban 5 mg twice daily) instead of clopidogrel, maintaining aspirin 81 mg daily.
+
+3. REVISED PRIMARY OUTCOME MEASURES
+- Primary Efficacy Endpoint: Transvalvular mean gradient threshold is revised to under 12 mmHg at 12-month follow-up (upgraded from 15 mmHg).

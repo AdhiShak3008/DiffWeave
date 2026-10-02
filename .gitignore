@@ -1,0 +1,19 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.class
+*.env
+.venv/
+env/
+dist/
+build/
+*.egg-info/
+
+# Node / Studio
+node_modules/
+dist/
+.vite/
+
+# Local DiffWeave data
+.diffweave/
+storage/

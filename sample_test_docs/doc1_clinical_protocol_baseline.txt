@@ -1,0 +1,22 @@
+CLINICAL TRIAL PROTOCOL: CARDIOVASCULAR REPAIR
+=======================================================
+Protocol ID: PROTOCOL-CR-2026-01
+Sponsor: Global BioHealth Institute
+Study Phase: Phase III Multi-Center Randomized Trial
+Effective Date: February 1, 2026
+
+1. STUDY OBJECTIVE
+This trial evaluates the safety and efficacy of the novel transcatheter bioprosthetic valve (AeroValve-X) in elderly patients diagnosed with severe symptomatic calcific aortic stenosis.
+
+2. PATIENT COHORT AND ENROLLMENT
+- Total Planned Enrollment: 1,200 adult patients across 35 clinical sites.
+- Target Patient Age: Adults aged 65 years or older.
+- Baseline Diagnostic Requirement: Aortic valve area strictly less than 0.8 cm2 measured via echocardiogram.
+
+3. DOSAGE AND INTERVENTION PROTOCOL
+- Surgical Intervention: Implantation of the AeroValve-X bioprosthetic valve via transfemoral approach.
+- Post-Operative Anticoagulation: Patients receive daily low-dose aspirin (81 mg) combined with clopidogrel for 6 months post-procedure.
+
+4. PRIMARY OUTCOME MEASURES
+- Primary Safety Endpoint: All-cause mortality rate within 30 days of procedure.
+- Primary Efficacy Endpoint: Significant reduction in transvalvular mean gradient to under 15 mmHg at 12-month follow-up.
