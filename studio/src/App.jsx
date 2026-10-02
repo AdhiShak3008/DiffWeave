@@ -1,7 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api/client';
 import Navbar from './components/Navbar';
-import CodeOverview from './components/CodeOverview';
 import SemanticDiffViewer from './components/SemanticDiffViewer';
 import PRReviewDeck from './components/PRReviewDeck';
 import IngestionStaging from './components/IngestionStaging';
@@ -10,12 +9,12 @@ import KnowledgeBase from './components/KnowledgeBase';
 import PolicyRulesLab from './components/PolicyRulesLab';
 import AuditLog from './components/AuditLog';
 import AuthView from './components/AuthView';
-import { RefreshCw, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertCircle, Sparkles, GitBranch } from 'lucide-react';
 
 export default function App() {
   const [workspaces, setWorkspaces] = useState([]);
   const [currentWorkspace, setCurrentWorkspace] = useState(null);
-  const [activeTab, setActiveTab] = useState('code'); // default to GitHub Code view
+  const [activeTab, setActiveTab] = useState('diff'); // Default to Semantic Diff Viewer!
   const [currentUser, setCurrentUser] = useState(null);
 
   // State data
@@ -47,7 +46,7 @@ export default function App() {
           setCurrentWorkspace(wsList[0]);
         }
       } catch (err) {
-        showToast(`Connecting to DiffWeave Bridge...`, 'info');
+        showToast(`Connecting to DiffWeave FastMCP Bridge...`, 'info');
       }
 
       // Check current user
@@ -71,11 +70,11 @@ export default function App() {
     setRefreshing(true);
 
     try {
-      if (activeTab === 'diff' || activeTab === 'code') {
+      if (activeTab === 'diff') {
         const diffRes = await api.getSemanticDiff(wsId);
         setDiff(diffRes);
       }
-      if (activeTab === 'prs' || activeTab === 'code') {
+      if (activeTab === 'prs') {
         const prsRes = await api.getProposals(wsId);
         setProposals(prsRes || []);
       }
@@ -87,7 +86,7 @@ export default function App() {
         const graphRes = await api.getKnowledgeGraph(wsId);
         setGraphData(graphRes);
       }
-      if (activeTab === 'knowledge' || activeTab === 'code') {
+      if (activeTab === 'knowledge') {
         const kRes = await api.getKnowledgeItems(wsId);
         setKnowledgeItems(kRes || []);
       }
@@ -203,7 +202,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0D1117] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/20 selection:text-emerald-300">
-      {/* GitHub Multi-tier Navigation */}
+      {/* Platform Navigation */}
       <Navbar
         workspaces={workspaces}
         currentWorkspace={currentWorkspace}
@@ -215,20 +214,46 @@ export default function App() {
         currentUser={currentUser}
         onOpenAuth={() => setActiveTab('auth')}
         onLogout={handleLogout}
+        onRefresh={() => refreshData()}
+        refreshing={refreshing}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* TAB 1: Code Overview (Default GitHub Repo Home) */}
-        {activeTab === 'code' && (
-          <CodeOverview
-            currentWorkspace={currentWorkspace}
-            stats={stats}
-            onNavigateTab={setActiveTab}
-          />
-        )}
+        {/* Workspace Context Bar */}
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center space-x-2">
+            <span className="font-semibold text-white flex items-center space-x-1">
+              <GitBranch className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Knowledge Branch:</span>
+            </span>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20 font-bold">
+              main
+            </span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-400 font-mono text-[11px]">
+              Workspace: {currentWorkspace?.id || '4314fb04-95be-41a2-bef4-50bf27c9c363'}
+            </span>
+          </div>
 
-        {/* TAB 2: Semantic Diff Viewer */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setActiveTab('staging')}
+              className="px-2.5 py-1 rounded-md bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition"
+            >
+              + Stage Document
+            </button>
+            <button
+              onClick={() => refreshData()}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white transition"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-emerald-400' : ''}`} />
+              <span>Sync</span>
+            </button>
+          </div>
+        </div>
+
+        {/* TAB 1: Semantic Diff Viewer (Default!) */}
         {activeTab === 'diff' && (
           <SemanticDiffViewer
             diffData={diff}
@@ -238,7 +263,7 @@ export default function App() {
           />
         )}
 
-        {/* TAB 3: Pull Requests Deck */}
+        {/* TAB 2: Pull Requests Deck */}
         {activeTab === 'prs' && (
           <PRReviewDeck
             proposals={proposals}
@@ -248,7 +273,12 @@ export default function App() {
           />
         )}
 
-        {/* TAB 4: Ingestion Staging */}
+        {/* TAB 3: Knowledge Graph DAG Canvas */}
+        {activeTab === 'graph' && (
+          <KnowledgeGraph graphData={graphData} loading={loading} />
+        )}
+
+        {/* TAB 4: Documents & Ingestion Staging */}
         {activeTab === 'staging' && (
           <IngestionStaging
             documents={documents}
@@ -258,21 +288,7 @@ export default function App() {
           />
         )}
 
-        {/* TAB 5: Knowledge Graph DAG Canvas */}
-        {activeTab === 'graph' && (
-          <KnowledgeGraph graphData={graphData} loading={loading} />
-        )}
-
-        {/* TAB 6: Knowledge Base Register */}
-        {activeTab === 'knowledge' && (
-          <KnowledgeBase
-            knowledgeItems={knowledgeItems}
-            currentWorkspace={currentWorkspace}
-            loading={loading}
-          />
-        )}
-
-        {/* TAB 7: Policy Rules CI Lab */}
+        {/* TAB 5: Policy Rules CI Lab */}
         {activeTab === 'rules' && (
           <PolicyRulesLab
             rules={rules}
@@ -284,12 +300,21 @@ export default function App() {
           />
         )}
 
-        {/* TAB 8: Audit Timeline Log */}
+        {/* TAB 6: Master Truth Register */}
+        {activeTab === 'knowledge' && (
+          <KnowledgeBase
+            knowledgeItems={knowledgeItems}
+            currentWorkspace={currentWorkspace}
+            loading={loading}
+          />
+        )}
+
+        {/* TAB 7: Audit Timeline Log */}
         {activeTab === 'audit' && (
           <AuditLog activityFeed={activity} loading={loading} />
         )}
 
-        {/* TAB 9: Dedicated Authentication & API Keys Page */}
+        {/* TAB 8: Dedicated Authentication & API Keys Page */}
         {activeTab === 'auth' && (
           <AuthView
             currentUser={currentUser}
@@ -297,7 +322,7 @@ export default function App() {
               setCurrentUser(user);
               showToast(`Authenticated as ${user.username || 'Evaluator'}!`);
             }}
-            onReturnToStudio={() => setActiveTab('code')}
+            onReturnToStudio={() => setActiveTab('diff')}
           />
         )}
       </main>

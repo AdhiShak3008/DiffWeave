@@ -1,32 +1,26 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState } from 'react';
 import {
-  Code2,
   FileDiff,
   GitPullRequest,
   Network,
   ShieldCheck,
-  UploadCloud,
+  Files,
   Database,
   History,
   Key,
-  Star,
-  GitFork,
-  Eye,
-  Pin,
   Search,
-  Bell,
-  Plus,
   User,
   LogOut,
-  Sparkles,
   ExternalLink,
   ChevronDown,
   Layers,
   CheckCircle2,
   Lock,
-  Cpu
+  Cpu,
+  Plus,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
-import { api } from '../api/client';
 
 export default function Navbar({
   workspaces,
@@ -39,23 +33,13 @@ export default function Navbar({
   currentUser,
   onOpenAuth,
   onLogout,
+  onRefresh,
+  refreshing,
 }) {
   const [showWsDropdown, setShowWsDropdown] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newWsName, setNewWsName] = useState('');
-  const [starred, setStarred] = useState(false);
-  const [starCount, setStarCount] = useState(142);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-
-  const toggleStar = () => {
-    if (starred) {
-      setStarCount((c) => c - 1);
-      setStarred(false);
-    } else {
-      setStarCount((c) => c + 1);
-      setStarred(true);
-    }
-  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -66,32 +50,31 @@ export default function Navbar({
   };
 
   const tabs = [
-    { id: 'code', label: 'Code', icon: Code2 },
     { id: 'diff', label: 'Semantic Diff', icon: FileDiff, badge: stats?.pending_proposals ? `${stats.pending_proposals}` : '2' },
-    { id: 'prs', label: 'Pull Requests', icon: GitPullRequest, badge: stats?.pending_proposals ? `${stats.pending_proposals}` : '3' },
-    { id: 'graph', label: 'Knowledge Graph', icon: Network },
-    { id: 'rules', label: 'Policy Rules', icon: ShieldCheck, badge: '3' },
-    { id: 'staging', label: 'Ingestion', icon: UploadCloud },
-    { id: 'knowledge', label: 'Knowledge Base', icon: Database, badge: stats?.total_knowledge_items ? `${stats.total_knowledge_items}` : '18' },
+    { id: 'prs', label: 'Knowledge PRs', icon: GitPullRequest, badge: stats?.pending_proposals ? `${stats.pending_proposals}` : '3' },
+    { id: 'graph', label: 'Topology Graph', icon: Network },
+    { id: 'staging', label: 'Documents & Staging', icon: Files, badge: stats?.total_documents ? `${stats.total_documents}` : '4' },
+    { id: 'rules', label: 'Policy CI Rules', icon: ShieldCheck, badge: '3' },
+    { id: 'knowledge', label: 'Master Truth Register', icon: Database, badge: stats?.total_knowledge_items ? `${stats.total_knowledge_items}` : '18' },
     { id: 'audit', label: 'Audit Trail', icon: History },
-    { id: 'auth', label: 'API Keys & Auth', icon: Key, badge: currentUser ? 'Active' : 'Login' },
+    { id: 'auth', label: 'API Keys & Auth', icon: Key, badge: currentUser ? 'Active' : 'DocWeave' },
   ];
 
   return (
     <header className="w-full bg-[#0D1117] border-b border-[#30363D] text-slate-100 select-none">
       {/* --------------------------------------------------------------------- */}
-      {/* TIER 1: Global GitHub Navigation Bar (#010409) */}
+      {/* TIER 1: Global Platform Bar (#010409) */}
       {/* --------------------------------------------------------------------- */}
       <div className="bg-[#010409] border-b border-[#30363D] px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs">
         {/* Left: Brand & Workspace Selector */}
         <div className="flex items-center space-x-3">
           {/* DiffWeave Logo */}
           <div
-            onClick={() => onSelectTab('code')}
+            onClick={() => onSelectTab('diff')}
             className="flex items-center space-x-2.5 cursor-pointer group"
           >
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-500 p-0.5 shadow-md group-hover:scale-105 transition">
-              <div className="w-full h-full bg-[#010409] rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 via-teal-500 to-sky-500 p-0.5 shadow-md group-hover:scale-105 transition">
+              <div className="w-full h-full bg-[#010409] rounded-[6px] flex items-center justify-center">
                 <Layers className="w-4 h-4 text-emerald-400" />
               </div>
             </div>
@@ -100,7 +83,7 @@ export default function Navbar({
                 DiffWeave
               </span>
               <span className="text-[10px] text-slate-400 font-mono -mt-1">
-                FastMCP Platform
+                Document Git Platform
               </span>
             </div>
           </div>
@@ -113,8 +96,9 @@ export default function Navbar({
               onClick={() => setShowWsDropdown(!showWsDropdown)}
               className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-200 transition font-medium"
             >
-              <span className="truncate max-w-[140px] text-xs">
-                {currentWorkspace?.name || 'default-workspace'}
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="truncate max-w-[150px] text-xs">
+                {currentWorkspace?.name || 'Default Workspace'}
               </span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
@@ -122,7 +106,7 @@ export default function Navbar({
             {showWsDropdown && (
               <div className="absolute left-0 mt-1.5 w-64 bg-[#161B22] border border-[#30363D] rounded-lg shadow-2xl p-2 z-40 space-y-1">
                 <div className="text-[10px] font-bold text-slate-400 px-2 py-1 uppercase tracking-wider">
-                  Select Workspace
+                  Knowledge Workspaces
                 </div>
                 {workspaces.map((w) => (
                   <button
@@ -150,7 +134,7 @@ export default function Navbar({
                     className="w-full text-left px-2 py-1.5 rounded text-xs text-sky-400 hover:bg-[#21262D] font-semibold flex items-center space-x-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>New Workspace...</span>
+                    <span>New Document Workspace...</span>
                   </button>
                 </div>
               </div>
@@ -158,7 +142,7 @@ export default function Navbar({
           </div>
         </div>
 
-        {/* Center: Command Palette Global Search (GitHub Style) */}
+        {/* Center: Global Search */}
         <div className="hidden md:flex items-center flex-1 max-w-sm mx-6">
           <div className="w-full relative flex items-center">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3" />
@@ -166,7 +150,7 @@ export default function Navbar({
               type="text"
               readOnly
               onClick={() => onSelectTab('knowledge')}
-              placeholder="Type / to search knowledge entities, PRs, rules..."
+              placeholder="Search claims, policies, documents, rules... (press /)"
               className="w-full pl-8 pr-8 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-[11px] text-slate-300 placeholder-slate-500 cursor-pointer transition focus:outline-none"
             />
             <span className="absolute right-2 text-[10px] font-mono text-slate-500 bg-[#0D1117] border border-[#30363D] px-1.5 py-0.5 rounded">
@@ -175,11 +159,11 @@ export default function Navbar({
           </div>
         </div>
 
-        {/* Right: FastMCP Pill + User Auth Pill */}
+        {/* Right: FastMCP Status & Identity */}
         <div className="flex items-center space-x-3">
           {/* FastMCP Pill */}
           <div className="hidden lg:flex items-center space-x-1.5 px-2.5 py-0.8 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[11px]">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <Cpu className="w-3.5 h-3.5 text-emerald-400" />
             <span>FastMCP: 29 Tools Active (14ms)</span>
           </div>
 
@@ -194,6 +178,17 @@ export default function Navbar({
             <span>DocWeave Portal</span>
             <ExternalLink className="w-3 h-3" />
           </a>
+
+          {/* Sync Button */}
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="p-1.5 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white transition"
+              title="Sync Workspace with FastMCP"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-emerald-400' : ''}`} />
+            </button>
+          )}
 
           {/* User Profile / Auth Button */}
           {currentUser ? (
@@ -253,70 +248,46 @@ export default function Navbar({
       </div>
 
       {/* --------------------------------------------------------------------- */}
-      {/* TIER 2: Repository Header & Social Counters (#0D1117) */}
+      {/* TIER 2: Workspace Document Context Header (#0D1117) */}
       {/* --------------------------------------------------------------------- */}
-      <div className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        {/* Repo Breadcrumb */}
-        <div className="flex items-center space-x-2 text-base sm:text-lg">
-          <Layers className="w-5 h-5 text-slate-400" />
-          <span className="text-sky-400 hover:underline cursor-pointer font-medium">
-            AdhiShak3008
-          </span>
-          <span className="text-slate-500">/</span>
-          <span className="text-white font-bold hover:underline cursor-pointer">
-            DiffWeave
-          </span>
-          <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#161B22] border border-[#30363D] text-slate-300">
-            Public
-          </span>
+      <div className="px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Workspace Title & Badge */}
+        <div className="flex items-center space-x-2.5">
+          <Files className="w-5 h-5 text-emerald-400" />
+          <div className="flex items-center space-x-2">
+            <span className="text-white font-bold text-base sm:text-lg">
+              {currentWorkspace?.name || 'Enterprise Policy & Knowledge Base'}
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">
+              Deterministic RAG
+            </span>
+          </div>
         </div>
 
-        {/* GitHub Action Badges (Pin, Watch, Fork, Star) */}
+        {/* Real Document Platform KPI Badges */}
         <div className="flex items-center space-x-2 text-xs font-semibold">
-          {/* Watch */}
-          <div className="inline-flex rounded-md shadow-sm">
-            <button className="flex items-center space-x-1 px-2.5 py-1 rounded-l-md bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-slate-200 transition">
-              <Eye className="w-3.5 h-3.5 text-slate-400" />
-              <span>Watch</span>
-            </button>
-            <span className="px-2 py-1 rounded-r-md bg-[#161B22] border-y border-r border-[#30363D] text-slate-300 font-mono text-[11px]">
-              14
-            </span>
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
+            <Files className="w-3.5 h-3.5 text-sky-400" />
+            <span>Tracked Docs:</span>
+            <span className="text-white font-bold font-mono">{stats?.total_documents || 4}</span>
           </div>
 
-          {/* Fork */}
-          <div className="inline-flex rounded-md shadow-sm">
-            <button className="flex items-center space-x-1 px-2.5 py-1 rounded-l-md bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-slate-200 transition">
-              <GitFork className="w-3.5 h-3.5 text-slate-400" />
-              <span>Fork</span>
-            </button>
-            <span className="px-2 py-1 rounded-r-md bg-[#161B22] border-y border-r border-[#30363D] text-slate-300 font-mono text-[11px]">
-              4
-            </span>
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
+            <Database className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Verified Truth:</span>
+            <span className="text-white font-bold font-mono">{stats?.total_knowledge_items || 18} Facts</span>
           </div>
 
-          {/* Star (Interactive!) */}
-          <div className="inline-flex rounded-md shadow-sm">
-            <button
-              onClick={toggleStar}
-              className={`flex items-center space-x-1 px-2.5 py-1 rounded-l-md border border-[#30363D] transition ${
-                starred
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                  : 'bg-[#21262D] hover:bg-[#30363D] text-slate-200'
-              }`}
-            >
-              <Star className={`w-3.5 h-3.5 ${starred ? 'text-amber-400 fill-amber-400' : 'text-slate-400'}`} />
-              <span>{starred ? 'Starred' : 'Star'}</span>
-            </button>
-            <span className="px-2 py-1 rounded-r-md bg-[#161B22] border-y border-r border-[#30363D] text-slate-300 font-mono text-[11px]">
-              {starCount}
-            </span>
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
+            <GitPullRequest className="w-3.5 h-3.5 text-amber-400" />
+            <span>Pending PRs:</span>
+            <span className="text-amber-400 font-bold font-mono">{stats?.pending_proposals || 3}</span>
           </div>
         </div>
       </div>
 
       {/* --------------------------------------------------------------------- */}
-      {/* TIER 3: The Iconic GitHub Sticky Underline Tabs */}
+      {/* TIER 3: Knowledge Git Tabs */}
       {/* --------------------------------------------------------------------- */}
       <nav className="px-4 sm:px-6 flex space-x-1 overflow-x-auto text-xs font-semibold no-scrollbar">
         {tabs.map((tab) => {
@@ -354,14 +325,14 @@ export default function Navbar({
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#161B22] border border-[#30363D] rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-base font-bold text-white">Create New Knowledge Workspace</h3>
+            <h3 className="text-base font-bold text-white">Create New Document Workspace</h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-300">Workspace Identifier</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. enterprise-docs-v2"
+                  placeholder="e.g. security-policies-2026"
                   value={newWsName}
                   onChange={(e) => setNewWsName(e.target.value)}
                   className="w-full mt-1 px-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
