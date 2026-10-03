@@ -134,11 +134,11 @@ export default function Login() {
         let meRes;
         try {
           meRes = await fetch(`${API_BASE}/auth/me`, {
-            headers: { Authorization: Bearer  },
+            headers: { Authorization: `Bearer ${cleanKey}` },
           });
         } catch {
           meRes = await fetch("https://shak3008-diffweave.hf.space/api/auth/me", {
-            headers: { Authorization: Bearer  },
+            headers: { Authorization: `Bearer ${cleanKey}` },
           });
         }
 
@@ -216,17 +216,17 @@ export default function Login() {
       <div className="dw-auth-tabs">
         <button
           type="button"
-          className={dw-auth-tab }
+          className={`dw-auth-tab ${loginMode === 'email' ? 'dw-auth-tab--active' : ''}`}
           onClick={() => { setLoginMode('email'); setError(null); }}
         >
-          <span>?? Email & Password</span>
+          <span>Email & Password</span>
         </button>
         <button
           type="button"
-          className={dw-auth-tab }
+          className={`dw-auth-tab ${loginMode === 'apikey' ? 'dw-auth-tab--active' : ''}`}
           onClick={() => { setLoginMode('apikey'); setError(null); }}
         >
-          <span>?? Login with API Key</span>
+          <span>Login with API Key</span>
         </button>
       </div>
 
@@ -254,7 +254,7 @@ export default function Login() {
               className="dw-input"
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
-              placeholder="????????"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -286,7 +286,7 @@ export default function Login() {
           {error && <div className="dw-auth-form__error">{error}</div>}
 
           <button type="submit" className="dw-btn dw-btn--primary" disabled={loading}>
-            {loading ? "Signing in?" : "Sign in"}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
 
           <div className="dw-auth-form__footer-text">
@@ -303,7 +303,7 @@ export default function Login() {
             onClick={handleDemoLogin}
             disabled={demoLoading || loading}
           >
-            {demoLoading ? "Starting demo workspace?" : "? Quick Demo Access (No account needed)"}
+            {demoLoading ? "Starting demo workspace…" : "⚡ Quick Demo Access (No account needed)"}
           </button>
         </form>
       ) : (
@@ -340,7 +340,7 @@ export default function Login() {
           {error && <div className="dw-auth-form__error">{error}</div>}
 
           <button type="submit" className="dw-btn dw-btn--primary" disabled={loading}>
-            {loading ? "Validating token?" : "Sign in with API Key"}
+            {loading ? "Validating token…" : "Sign in with API Key"}
           </button>
 
           <div className="dw-auth-form__footer-text">
@@ -357,7 +357,7 @@ export default function Login() {
             onClick={handleDemoLogin}
             disabled={demoLoading || loading}
           >
-            {demoLoading ? "Starting demo workspace?" : "? Quick Demo Access (No account needed)"}
+            {demoLoading ? "Starting demo workspace…" : "⚡ Quick Demo Access (No account needed)"}
           </button>
         </form>
       )}
