@@ -88,7 +88,6 @@ export default function Navbar({
     { id: 'knowledge', label: 'Master Truth Register', icon: Database, badge: verifiedFacts > 0 ? `${verifiedFacts}` : undefined },
     { id: 'audit', label: 'Audit Trail', icon: History },
     { id: 'quickstart', label: 'CLI Quickstart', icon: Terminal },
-    { id: 'auth', label: 'API Keys & Auth', icon: Key, badge: currentUser ? 'Active' : 'DocWeave' },
   ];
 
   return (
@@ -260,12 +259,18 @@ export default function Navbar({
                   <button
                     onClick={() => {
                       setShowUserDropdown(false);
-                      onSelectTab('auth');
+                      const tok = localStorage.getItem("diffweave_token") || localStorage.getItem("token") || "";
+                      if (tok) {
+                        navigator.clipboard.writeText(tok);
+                        alert("Personal Access Token / API Key copied to clipboard!");
+                      } else {
+                        alert("No active API token found.");
+                      }
                     }}
                     className="w-full text-left px-2 py-1.5 rounded text-slate-300 hover:bg-[#21262D] flex items-center space-x-2"
                   >
                     <Key className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Personal Access Tokens</span>
+                    <span>Copy API Key</span>
                   </button>
                   <button
                     onClick={() => {

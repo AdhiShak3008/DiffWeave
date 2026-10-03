@@ -489,3 +489,41 @@ code, pre, .font-mono {
 .dw-auth-form__link:hover {
   text-decoration: underline;
 }
+
+/* Auth Tabs (Email vs API Key) */
+.dw-auth-tabs {
+  display: flex;
+  background: #161B22;
+  border: 1px solid #30363D;
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.dw-auth-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: #8B949E;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dw-auth-tab:hover {
+  color: #F0F6FC;
+}
+
+.dw-auth-tab--active {
+  background: #21262D;
+  color: #10B981;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}

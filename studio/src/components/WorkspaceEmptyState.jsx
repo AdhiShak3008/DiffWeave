@@ -12,7 +12,9 @@ import {
   Sparkles,
   ExternalLink,
   Code2,
-  CheckCircle2
+  CheckCircle2,
+  Globe,
+  Laptop
 } from 'lucide-react';
 
 export default function WorkspaceEmptyState({
@@ -53,66 +55,46 @@ export default function WorkspaceEmptyState({
     }
   };
 
-  const cliSnippet1 = `# 1. Install or upgrade the DiffWeave CLI
-pip install diffweave
+  const cliSnippet1 = `# 1. Install DiffWeave CLI (works on any system: macOS, Linux, Windows)
+pip install git+https://github.com/AdhiShak3008/DiffWeave.git
 
-# 2. Authenticate CLI session with your token
-diffweave login --token ` + (token ? token.slice(0, 16) + '...' : 'YOUR_TOKEN') + `
+# 2. Authenticate CLI session with your DocWeave credentials or token
+dw login --email ${currentUser?.email || 'you@company.com'}
+# Or with API token: dw login --token ${token ? token.slice(0, 16) + '...' : 'YOUR_TOKEN'}
 
 # 3. Initialize this workspace locally in your document directory
-diffweave init --workspace ` + wsId + `
+dw init --workspace ${wsId}
 
 # 4. Stage your documents or policy files for deterministic parsing
-diffweave add ./policies/*.pdf
+dw add ./policies/*.pdf
 
 # 5. Run deterministic semantic diff & policy CI validation
-diffweave diff
+dw diff
 
-# 6. Commit & push verified knowledge to main
-diffweave commit -m "Initial document ingestion"
-diffweave push`;
+# 6. Commit & push verified knowledge to cloud
+dw commit -m "Initial document ingestion"
+dw push`;
 
-  const cliSnippet2 = `# Push an existing local folder or document collection
+  const cliSnippet2 = `# Push an existing document folder from any terminal
 cd my-document-repo
-diffweave remote add origin https://diff-weave.vercel.app/api/workspaces/` + wsId + `
-diffweave branch -M main
-diffweave push -u origin main`;
+dw init --workspace ${wsId}
+dw add .
+dw diff
+dw commit -m "Add workspace documents"
+dw push`;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto py-2">
-      {/* Top Banner Notice */}
-      <div className="bg-gradient-to-r from-emerald-950/40 via-[#161B22] to-sky-950/40 border border-emerald-500/30 rounded-xl p-5 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-3.5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-            <Sparkles className="w-5 h-5 text-emerald-400" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-white">Workspace is empty</h3>
-            <p className="text-xs text-slate-300 mt-0.5">
-              Populate <span className="text-emerald-300 font-semibold">{workspace?.name || 'this workspace'}</span> with documents to start generating deterministic knowledge diffs, policy rules, and PRs.
-            </p>
-          </div>
-        </div>
-        {onDismissEmptyState && (
-          <button
-            onClick={onDismissEmptyState}
-            className="text-xs px-3 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-slate-300 transition whitespace-nowrap self-start sm:self-auto font-medium"
-          >
-            Explore Empty Studio Tabs &rarr;
-          </button>
-        )}
-      </div>
-
-      {/* GitHub-style Quick Setup Terminal Box */}
+    <div className="max-w-4xl mx-auto space-y-6 py-4">
+      {/* GitHub-style Quick Setup Header Card */}
       <div className="bg-[#161B22] border border-[#30363D] rounded-xl overflow-hidden shadow-2xl">
-        <div className="bg-[#010409] px-6 py-4 border-b border-[#30363D] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-[#21262D]/70 border-b border-[#30363D] px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center space-x-2 text-white font-bold text-base">
+            <div className="flex items-center space-x-2">
               <Terminal className="w-5 h-5 text-emerald-400" />
-              <span>Quick setup — if you've done this kind of thing before</span>
+              <h3 className="text-base font-bold text-white">Quick setup ? if you?ve done this kind of thing before</h3>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Get started by using the DiffWeave CLI, pushing existing documents, or uploading files directly below.
+              Follow these commands to push documents into <strong className="text-slate-200">{workspace?.name || 'this workspace'}</strong> or upload directly below.
             </p>
           </div>
           <div className="flex items-center space-x-2 text-xs font-mono">
@@ -126,6 +108,30 @@ diffweave push -u origin main`;
             >
               {copiedId === 'wsid' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
+          </div>
+        </div>
+
+        {/* Cross-Platform Cloud Notice Banner */}
+        <div className="mx-6 mt-6 rounded-xl bg-gradient-to-r from-emerald-950/40 via-[#0D1117] to-sky-950/30 border border-emerald-500/30 p-4">
+          <div className="flex items-start space-x-3.5">
+            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 mt-0.5 shrink-0">
+              <Globe className="w-5 h-5" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="text-xs font-bold text-white">Works on Any Machine (macOS, Linux, Windows)</h4>
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Remote Cloud Collaboration
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                These CLI commands are <strong>not restricted to this computer</strong>. Anyone on your team can install the CLI on their own machine, authenticate with their DocWeave account, and collaborate on this cloud workspace remotely. Changes, diffs, and commits reflect live in this Studio.
+              </p>
+              <div className="flex items-center space-x-2 pt-1 text-[11px] font-mono text-slate-400">
+                <Laptop className="w-3.5 h-3.5 text-slate-400" />
+                <span>Global install: <code className="text-emerald-400 bg-black/40 px-1.5 py-0.5 rounded">pip install git+https://github.com/AdhiShak3008/DiffWeave.git</code></span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -156,24 +162,25 @@ diffweave push -u origin main`;
             </div>
 
             <div className="rounded-lg bg-[#0D1117] border border-[#30363D] p-4 font-mono text-xs text-slate-200 overflow-x-auto shadow-inner leading-relaxed">
-              <p className="text-slate-500"># 1. Install or upgrade the DiffWeave CLI</p>
-              <p><span className="text-emerald-400 font-bold">pip</span> install diffweave</p>
+              <p className="text-slate-500"># 1. Install DiffWeave CLI (works on any system: macOS, Linux, Windows)</p>
+              <p><span className="text-emerald-400 font-bold">pip</span> install git+https://github.com/AdhiShak3008/DiffWeave.git</p>
               <br />
-              <p className="text-slate-500"># 2. Authenticate CLI session with your Personal Access Token</p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> login --token <span className="text-amber-300 font-semibold">{token ? token.slice(0, 20) + '...' : 'YOUR_TOKEN'}</span></p>
+              <p className="text-slate-500"># 2. Authenticate CLI session with your DocWeave account</p>
+              <p><span className="text-emerald-400 font-bold">dw</span> login --email <span className="text-slate-300">{currentUser?.email || 'you@company.com'}</span></p>
+              <p className="text-slate-500"># (or with token: dw login --token <span className="text-amber-300 font-semibold">{token ? token.slice(0, 16) + '...' : 'YOUR_TOKEN'}</span>)</p>
               <br />
               <p className="text-slate-500"># 3. Initialize this workspace locally in your document folder</p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> init --workspace <span className="text-sky-300 font-semibold">{wsId}</span></p>
+              <p><span className="text-emerald-400 font-bold">dw</span> init --workspace <span className="text-sky-300 font-semibold">{wsId}</span></p>
               <br />
               <p className="text-slate-500"># 4. Stage your documents or policy files for deterministic parsing</p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> add ./policies/*.pdf</p>
+              <p><span className="text-emerald-400 font-bold">dw</span> add ./policies/*.pdf</p>
               <br />
               <p className="text-slate-500"># 5. Run deterministic semantic diff & policy CI validation</p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> diff</p>
+              <p><span className="text-emerald-400 font-bold">dw</span> diff</p>
               <br />
-              <p className="text-slate-500"># 6. Commit & push verified knowledge to main</p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> commit -m <span className="text-teal-300 font-semibold">"Initial document ingestion"</span></p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> push</p>
+              <p className="text-slate-500"># 6. Commit & push verified knowledge to cloud master truth</p>
+              <p><span className="text-emerald-400 font-bold">dw</span> commit -m <span className="text-teal-300 font-semibold">"Initial document ingestion"</span></p>
+              <p><span className="text-emerald-400 font-bold">dw</span> push</p>
             </div>
           </div>
 
@@ -182,7 +189,7 @@ diffweave push -u origin main`;
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-bold text-white flex items-center space-x-2">
                 <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 font-mono text-xs flex items-center justify-center font-bold">2</span>
-                <span>…or push an existing document repository from the command line</span>
+                <span>?or push an existing document folder from any terminal</span>
               </h4>
               <button
                 onClick={() => copyToClipboard(cliSnippet2, 'cli2')}
@@ -203,9 +210,11 @@ diffweave push -u origin main`;
             </div>
             <div className="rounded-lg bg-[#0D1117] border border-[#30363D] p-3.5 font-mono text-xs text-slate-300 overflow-x-auto shadow-inner leading-relaxed">
               <p><span className="text-emerald-400 font-bold">cd</span> my-document-repo</p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> remote add origin https://diff-weave.vercel.app/api/workspaces/{wsId}</p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> branch -M main</p>
-              <p><span className="text-emerald-400 font-bold">diffweave</span> push -u origin main</p>
+              <p><span className="text-emerald-400 font-bold">dw</span> init --workspace <span className="text-sky-300 font-semibold">{wsId}</span></p>
+              <p><span className="text-emerald-400 font-bold">dw</span> add .</p>
+              <p><span className="text-emerald-400 font-bold">dw</span> diff</p>
+              <p><span className="text-emerald-400 font-bold">dw</span> commit -m <span className="text-teal-300 font-semibold">"Add workspace documents"</span></p>
+              <p><span className="text-emerald-400 font-bold">dw</span> push</p>
             </div>
           </div>
 
@@ -213,7 +222,7 @@ diffweave push -u origin main`;
           <div className="space-y-3 pt-3 border-t border-[#30363D]">
             <h4 className="text-sm font-bold text-white flex items-center space-x-2">
               <span className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 font-mono text-xs flex items-center justify-center font-bold">3</span>
-              <span>…or populate directly in browser by uploading files</span>
+              <span>?or populate directly in browser by uploading files</span>
             </h4>
 
             <label

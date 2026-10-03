@@ -12,7 +12,6 @@ import KnowledgeGraph from './components/KnowledgeGraph';
 import KnowledgeBase from './components/KnowledgeBase';
 import PolicyRulesLab from './components/PolicyRulesLab';
 import AuditLog from './components/AuditLog';
-import AuthView from './components/AuthView';
 import { RefreshCw, CheckCircle2, AlertCircle, Sparkles, GitBranch, ArrowLeft } from 'lucide-react';
 
 export default function App() {
@@ -263,7 +262,6 @@ export default function App() {
         onSelectTab={setActiveTab}
         stats={stats}
         currentUser={currentUser}
-        onOpenAuth={() => setActiveTab('auth')}
         onLogout={handleLogout}
         onRefresh={() => refreshData()}
         refreshing={refreshing}
@@ -281,7 +279,6 @@ export default function App() {
             onSelectWorkspace={handleSelectWorkspace}
             onCreateWorkspace={handleCreateWorkspace}
             currentUser={currentUser}
-            onOpenAuth={() => setActiveTab('auth')}
           />
         )}
 
@@ -408,17 +405,6 @@ export default function App() {
                   <AuditLog activityFeed={activity} loading={loading} />
                 )}
 
-                {/* TAB 8: Dedicated Authentication & API Keys Page */}
-                {activeTab === 'auth' && (
-                  <AuthView
-                    currentUser={currentUser}
-                    onAuthSuccess={(user) => {
-                      setCurrentUser(user);
-                      showToast(`Authenticated as ${user.username || 'Evaluator'}!`);
-                    }}
-                    onReturnToStudio={() => setActiveTab('diff')}
-                  />
-                )}
               </>
             )}
           </div>

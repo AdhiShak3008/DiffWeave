@@ -160,6 +160,39 @@ async def demo_login_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Demo login failed: {str(e)}")
 
+
+
+@app.post("/api/auth/token-login")
+@app.post("/auth/token-login")
+async def token_login_endpoint(request: _Request):
+    """
+    Direct login with Personal Access Token / API Key.
+    """
+    token = ""
+    content_type = request.headers.get("content-type", "")
+    if "application/x-www-form-urlencoded" in content_type:
+        form = await request.form()
+        token = form.get("token") or form.get("api_key", "")
+    else:
+        try:
+            data = await request.json()
+            token = data.get("token") or data.get("api_key", "")
+        except Exception:
+            pass
+
+    if not token or not str(token).strip():
+        raise HTTPException(status_code=400, detail="API key or personal access token is required.")
+
+    token = str(token).strip()
+    user = docweave_auth.get_current_user_from_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired API key / token.")
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": user,
+    }
 @app.get("/api/auth/me")
 @app.get("/api/auth/whoami")
 async def auth_me_endpoint(authorization: str = Header(None)):
