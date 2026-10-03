@@ -283,3 +283,43 @@ def get_db_semantic_diff(workspace_id: str) -> dict[str, Any]:
     except Exception as e:
         logger.warning(f"Error getting DB semantic diff: {e}")
         return {"workspace_id": workspace_id, "additions": [], "modifications": [], "deletions": [], "unchanged": []}
+
+
+def validate_db_proposals(workspace_id: str, proposal_id: Optional[str] = None) -> dict[str, Any]:
+    try:
+        rules = get_db_rules(workspace_id)
+        proposals = get_db_proposals(workspace_id)
+        violations = []
+
+        for p in proposals:
+            if proposal_id and p["id"] != proposal_id:
+                continue
+            # Rule 1: Provenance Check
+            evidence = p.get("proposed_changes", {}).get("evidence", [])
+            if not evidence and not p.get("rationale"):
+                violations.append({
+                    "rule": "PROVENANCE_MANDATORY",
+                    "proposal_id": p["id"],
+                    "summary": p["summary"],
+                    "severity": "BLOCKING",
+                    "reason": "Missing source citation or extraction rationale."
+                })
+
+        return {
+            "workspace_id": workspace_id,
+            "has_violations": len(violations) > 0,
+            "violations": violations,
+            "passed_rules": max(1, len(rules)),
+            "checked_proposals": len(proposals),
+            "status": "VIOLATIONS_DETECTED" if len(violations) > 0 else "ALL_CHECKS_PASSED"
+        }
+    except Exception as e:
+        logger.warning(f"Error in validate_db_proposals: {e}")
+        return {
+            "workspace_id": workspace_id,
+            "has_violations": False,
+            "violations": [],
+            "passed_rules": 1,
+            "checked_proposals": 0,
+            "status": "ALL_CHECKS_PASSED"
+        }

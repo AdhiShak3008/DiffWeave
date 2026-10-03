@@ -317,22 +317,6 @@ async def create_workspace(req: CreateWorkspaceRequest):
 @app.get("/api/workspaces/{workspace_id}/status")
 async def get_workspace_status(workspace_id: str):
     try:
-        stats = await client.get_dashboard_stats(workspace_id)
-        docs = await client.list_documents(workspace_id)
-        pending = await client.list_pending_proposals(workspace_id)
-        if not stats or (stats.get("total_documents", 0) == 0 and stats.get("knowledge_items", 0) == 0):
-            db_status = db_store.get_db_workspace_status(workspace_id)
-            if db_status.get("knowledge_items", 0) > 0 or db_status.get("total_documents", 0) > 0:
-                stats = db_status
-                docs = db_store.get_db_documents(workspace_id)
-                pending = db_store.get_db_proposals(workspace_id, status="PENDING")
-        return {
-            "workspace_id": workspace_id,
-            "stats": stats,
-            "documents": docs,
-            "pending_proposals": pending,
-        }
-    except Exception:
         db_status = db_store.get_db_workspace_status(workspace_id)
         docs = db_store.get_db_documents(workspace_id)
         pending = db_store.get_db_proposals(workspace_id, status="PENDING")
@@ -342,6 +326,8 @@ async def get_workspace_status(workspace_id: str):
             "documents": docs,
             "pending_proposals": pending,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -483,7 +469,7 @@ async def get_validation_endpoint(
     proposal_id: Optional[str] = Query(None),
 ):
     try:
-        return await client.validate_proposals(workspace_id, proposal_id)
+        return db_store.validate_db_proposals(workspace_id, proposal_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
