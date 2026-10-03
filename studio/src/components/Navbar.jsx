@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Layers,
   CheckCircle2,
+  Copy,
   Lock,
   Cpu,
   Plus,
@@ -41,6 +42,18 @@ export default function Navbar({
   refreshing,
 }) {
   const [showWsDropdown, setShowWsDropdown] = useState(false);
+  const [copiedApiKey, setCopiedApiKey] = useState(false);
+
+  const handleCopyApiKey = () => {
+    const tok = localStorage.getItem("diffweave_token") || localStorage.getItem("token") || "";
+    if (tok) {
+      navigator.clipboard.writeText(tok);
+      setCopiedApiKey(true);
+      setTimeout(() => setCopiedApiKey(false), 2000);
+    } else {
+      alert("No active API token found. Please sign in.");
+    }
+  };
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newWsName, setNewWsName] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -216,7 +229,7 @@ export default function Navbar({
         <div className="flex items-center space-x-3">
           {/* FastMCP Connected Pill */}
           <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#161B22] border border-[#30363D] text-[11px] text-slate-400 font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400 " />
             <Cpu className="w-3 h-3 text-emerald-400" />
             <span>FastMCP: Active</span>
           </div>

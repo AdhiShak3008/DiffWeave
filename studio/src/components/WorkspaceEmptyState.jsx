@@ -119,7 +119,7 @@ dw push`;
             </div>
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="text-xs font-bold text-white">Works on Any Machine (macOS, Linux, Windows)</h4>
+                <h4 className="text-xs font-bold text-white">Universal CLI & Multi-Platform Support</h4>
                 <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   Remote Cloud Collaboration
                 </span>

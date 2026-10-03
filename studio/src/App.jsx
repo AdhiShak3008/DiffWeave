@@ -105,10 +105,13 @@ export default function App() {
           if (statusRes.stats.total_documents !== undefined || statusRes.stats.knowledge_items !== undefined) {
             setCurrentWorkspace((prev) => {
               if (!prev) return prev;
+              const newD = statusRes.stats.total_documents ?? prev.d_count;
+              const newK = statusRes.stats.knowledge_items ?? prev.k_count;
+              if (prev.d_count === newD && prev.k_count === newK) return prev;
               return {
                 ...prev,
-                d_count: statusRes.stats.total_documents ?? prev.d_count,
-                k_count: statusRes.stats.knowledge_items ?? prev.k_count
+                d_count: newD,
+                k_count: newK
               };
             });
           }
@@ -121,7 +124,7 @@ export default function App() {
     } finally {
       setRefreshing(false);
     }
-  }, [currentWorkspace, activeTab]);
+  }, [currentWorkspace?.id, activeTab]);
 
   useEffect(() => {
     refreshData();

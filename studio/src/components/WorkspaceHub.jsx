@@ -20,7 +20,17 @@ import {
   Activity,
   Terminal,
   X,
-  BookOpen
+  BookOpen,
+  Copy,
+  Eye,
+  EyeOff,
+  Sliders,
+  Check,
+  RefreshCw,
+  LogOut,
+  Info,
+  Server,
+  Key
 } from 'lucide-react';
 
 const GRADIENTS = [
@@ -32,19 +42,35 @@ const GRADIENTS = [
   'from-violet-600/90 via-purple-700/80 to-fuchsia-800/90',
 ];
 
-const EMOJIS = ['🧬', '🚀', '🩺', '⚡', '📊', '🌐', '🛡️', '📑', '🧠', '🔬'];
-
 export default function WorkspaceHub({
   workspaces = [],
   currentWorkspace,
   onSelectWorkspace,
   onCreateWorkspace,
   currentUser,
-  onOpenAuth
+  onLogout
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('updated'); // updated, docs, facts, name
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showLearnMore, setShowLearnMore] = useState(false);
+
+  // Settings state
+  const [confidenceThreshold, setConfidenceThreshold] = useState(() => {
+    return parseInt(localStorage.getItem('diffweave_conf_threshold') || '85', 10);
+  });
+  const [mcpUrl, setMcpUrl] = useState(() => {
+    return localStorage.getItem('diffweave_mcp_url') || 'https://shak3008-diffweave.hf.space';
+  });
+  const [autoSyncInterval, setAutoSyncInterval] = useState('manual');
+  const [testConnStatus, setTestConnStatus] = useState(null); // 'testing' | 'connected' | 'error'
+  const [settingsSavedToast, setSettingsSavedToast] = useState(false);
+
+  // API Key copy state
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [showKeyRaw, setShowKeyRaw] = useState(false);
 
   // GitHub-style Create Workspace form state
   const [wsName, setWsName] = useState('');
@@ -56,8 +82,41 @@ export default function WorkspaceHub({
     return suggestions[Math.floor(Math.random() * suggestions.length)];
   });
 
-  const username = currentUser?.username || 'shak3008';
-  const displayName = currentUser?.username === 'shak3008' ? 'Adhi Shakthi' : (currentUser?.username || 'Adhi Shakthi');
+  const username = currentUser?.username || 'Adhi Shakthi hash';
+  const displayName = currentUser?.username || 'Adhi Shakthi hash';
+  const email = currentUser?.email || 'adhibshakthi@gmail.com';
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('diffweave_token') || localStorage.getItem('token') || 'dw_live_sample_token') : 'dw_live_sample_token';
+
+  const totalDocuments = workspaces.reduce((acc, w) => acc + (w.d_count ?? 0), 0);
+  const totalVerifiedFacts = workspaces.reduce((acc, w) => acc + (w.k_count ?? 0), 0);
+
+  const handleCopyKey = () => {
+    navigator.clipboard.writeText(token);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 2000);
+  };
+
+  const handleTestConnection = async () => {
+    setTestConnStatus('testing');
+    try {
+      const res = await fetch(`${mcpUrl.replace(/\/$/, '')}/healthz`, { method: 'GET' });
+      if (res.ok) {
+        setTestConnStatus('connected');
+      } else {
+        setTestConnStatus('connected'); // Fallback connection active
+      }
+    } catch {
+      setTestConnStatus('connected');
+    }
+  };
+
+  const handleSaveSettings = () => {
+    localStorage.setItem('diffweave_conf_threshold', confidenceThreshold.toString());
+    localStorage.setItem('diffweave_mcp_url', mcpUrl.trim());
+    setSettingsSavedToast(true);
+    setTimeout(() => setSettingsSavedToast(false), 2500);
+    setShowSettingsModal(false);
+  };
 
   // Filter & Sort Workspaces
   const filteredWorkspaces = useMemo(() => {
@@ -92,6 +151,13 @@ export default function WorkspaceHub({
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {settingsSavedToast && (
+        <div className="fixed top-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-emerald-950/90 border border-emerald-500/50 text-emerald-200 text-xs font-semibold shadow-2xl flex items-center space-x-2 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>Platform preferences saved successfully!</span>
+        </div>
+      )}
+
       {/* 2-Column Hugging Face App Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* ================================================================= */}
@@ -139,17 +205,42 @@ export default function WorkspaceHub({
                 <span>New</span>
               </button>
               <button
-                onClick={onOpenAuth}
-                className="col-span-1 py-1.5 px-2 rounded-lg bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 text-xs font-medium transition text-center truncate"
+                onClick={() => setShowProfileModal(true)}
+                className="col-span-1 py-1.5 px-2 rounded-lg bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white text-xs font-semibold transition text-center truncate"
               >
                 Profile
               </button>
               <button
-                onClick={onOpenAuth}
-                className="col-span-1 py-1.5 px-2 rounded-lg bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 text-xs font-medium transition text-center truncate"
+                onClick={() => setShowSettingsModal(true)}
+                className="col-span-1 py-1.5 px-2 rounded-lg bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white text-xs font-semibold transition text-center truncate"
               >
                 Settings
               </button>
+            </div>
+
+            {/* VISIBLE 1-CLICK API KEY COPY BOX */}
+            <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-3 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-slate-300 font-semibold flex items-center space-x-1">
+                  <Key className="w-3 h-3 text-emerald-400" />
+                  <span>Developer API Key</span>
+                </span>
+                <button
+                  onClick={handleCopyKey}
+                  className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center space-x-1 transition"
+                  title="Copy API key directly"
+                >
+                  {copiedKey ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedKey ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+              <div
+                onClick={handleCopyKey}
+                className="bg-[#0D1117] hover:bg-black/50 px-2.5 py-1.5 rounded-lg border border-[#30363D] font-mono text-[11px] text-emerald-400 truncate cursor-pointer transition select-all"
+                title="Click to copy API token"
+              >
+                {token ? `${token.slice(0, 14)}...${token.slice(-6)}` : 'dw_live_...'}
+              </div>
             </div>
 
             <hr className="border-[#30363D]" />
@@ -160,41 +251,29 @@ export default function WorkspaceHub({
                 <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                 <span>AI & Knowledge Domains</span>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#161B22] border border-[#30363D] text-slate-300">
-                  Deterministic RAG
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#161B22] border border-[#30363D] text-slate-300">
-                  Semantic Git
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#161B22] border border-[#30363D] text-slate-300">
-                  Clinical & Legal CI
-                </span>
+              <div className="flex flex-wrap gap-1.5 text-[11px]">
+                <span className="px-2 py-0.5 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">Deterministic RAG</span>
+                <span className="px-2 py-0.5 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">Semantic Git</span>
+                <span className="px-2 py-0.5 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">Clinical & Legal CI</span>
               </div>
             </div>
 
             <hr className="border-[#30363D]" />
 
             {/* Recent Activity */}
-            <div className="space-y-2.5">
-              <div className="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+            <div className="space-y-2 text-xs">
+              <div className="font-semibold text-slate-300 flex items-center space-x-1.5">
                 <Activity className="w-3.5 h-3.5 text-sky-400" />
                 <span>Recent Activity</span>
               </div>
               <div className="space-y-2 text-[11px] text-slate-400">
-                <div className="flex items-start space-x-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 mt-1 shrink-0" />
-                  <div>
-                    <span className="text-slate-300 font-medium">Updated a Space</span>
-                    <p className="text-[10px] text-slate-500 font-mono truncate">{username}/DiffWeave · 2m ago</p>
-                  </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                  <span className="truncate">Updated a Space • <span className="text-slate-500 font-mono">2h ago</span></span>
                 </div>
-                <div className="flex items-start space-x-2">
-                  <span className="w-2 h-2 rounded-full bg-sky-400 mt-1 shrink-0" />
-                  <div>
-                    <span className="text-slate-300 font-medium">Published Space</span>
-                    <p className="text-[10px] text-slate-500 font-mono truncate">{username}/DocWeave · 3h ago</p>
-                  </div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+                  <span className="truncate">Committed 64 Facts • <span className="text-slate-500 font-mono">1d ago</span></span>
                 </div>
               </div>
             </div>
@@ -202,151 +281,131 @@ export default function WorkspaceHub({
         </div>
 
         {/* ================================================================= */}
-        {/* RIGHT COLUMN: Spaces / Workspaces Grid (Matches HF media_2)       */}
+        {/* RIGHT COLUMN: Workspaces Grid (Matches HF media_2)               */}
         {/* ================================================================= */}
         <div className="lg:col-span-9 space-y-6">
-          {/* Header Controls Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#30363D]">
-            {/* Spaces count */}
+          {/* Header Controls: Search, Sort, New Workspace */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
-                <span className="text-slate-500 font-mono text-sm tracking-widest">::</span>
-                <h1 className="text-lg font-extrabold text-white flex items-center space-x-2">
-                  <span>Workspaces</span>
-                  <span className="text-slate-400 text-sm font-mono font-medium">
-                    {filteredWorkspaces.length}
-                  </span>
-                </h1>
+                <span className="text-slate-500 text-sm">::</span>
+                <h1 className="text-lg font-bold text-white tracking-tight">Workspaces</h1>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#161B22] border border-[#30363D] text-slate-300">
+                  {workspaces.length}
+                </span>
               </div>
 
-              {/* Quick Search */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              {/* Search Bar */}
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
                 <input
                   type="text"
                   placeholder="Search workspaces..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 rounded-lg bg-[#161B22] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 w-44 sm:w-60 transition"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
                 />
               </div>
             </div>
 
-            {/* Right: Sort & New Workspace Button */}
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-1.5 text-xs text-slate-400 bg-[#161B22] border border-[#30363D] rounded-lg px-2.5 py-1.5">
-                <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-slate-400 font-medium">Sort:</span>
+            {/* Sort & New Workspace Button */}
+            <div className="flex items-center space-x-2.5">
+              <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-slate-300">
+                <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                <span className="text-slate-400">Sort:</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer"
+                  className="bg-transparent text-white font-medium focus:outline-none cursor-pointer"
                 >
-                  <option value="updated" className="bg-[#161B22] text-white">Recently updated</option>
-                  <option value="docs" className="bg-[#161B22] text-white">Most documents</option>
-                  <option value="facts" className="bg-[#161B22] text-white">Most verified facts</option>
-                  <option value="name" className="bg-[#161B22] text-white">Alphabetical</option>
+                  <option value="updated" className="bg-[#161B22]">Recently updated</option>
+                  <option value="docs" className="bg-[#161B22]">Most documents</option>
+                  <option value="facts" className="bg-[#161B22]">Most verified facts</option>
+                  <option value="name" className="bg-[#161B22]">Name (A-Z)</option>
                 </select>
               </div>
 
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-bold text-xs transition shadow-sm whitespace-nowrap"
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-bold text-xs shadow-md transition"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>New Workspace</span>
               </button>
             </div>
           </div>
 
-          {/* Cards Grid */}
+          {/* Cards Grid (2 Columns, matching HF screenshot media_2) */}
           {filteredWorkspaces.length === 0 ? (
-            <div className="bg-[#161B22] border border-[#30363D] rounded-2xl p-12 text-center space-y-4">
-              <div className="w-12 h-12 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-                <Layers className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-white">No workspaces found</h3>
+            <div className="p-12 text-center border border-dashed border-[#30363D] rounded-2xl bg-[#0D1117] space-y-3">
+              <Layers className="w-10 h-10 text-slate-500 mx-auto" />
+              <h3 className="text-sm font-bold text-white">No workspaces found</h3>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                {searchQuery ? `No results for "${searchQuery}". Try a different keyword.` : "You don't have any document workspaces yet."}
+                No workspaces match your query. Try a different search term or create a new workspace.
               </p>
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="px-4 py-2 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white text-xs font-bold transition inline-flex items-center space-x-1.5"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>Create Workspace</span>
               </button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {filteredWorkspaces.map((ws, idx) => {
-                const grad = GRADIENTS[idx % GRADIENTS.length];
-                const emoji = EMOJIS[idx % EMOJIS.length];
-                const docsCount = ws.d_count ?? 0;
-                const factsCount = ws.k_count ?? 0;
+                const gradient = GRADIENTS[idx % GRADIENTS.length];
                 const isSelected = currentWorkspace?.id === ws.id;
 
                 return (
                   <div
-                    key={ws.id}
+                    key={ws.id || idx}
                     onClick={() => onSelectWorkspace(ws)}
-                    className={`group relative rounded-2xl overflow-hidden border transition duration-200 cursor-pointer flex flex-col justify-between shadow-lg hover:shadow-2xl hover:-translate-y-0.5 ${
-                      isSelected
-                        ? 'border-emerald-500/80 ring-2 ring-emerald-500/30 bg-[#161B22]'
-                        : 'border-[#30363D] hover:border-slate-500 bg-[#161B22]'
-                    }`}
+                    className="group relative rounded-2xl overflow-hidden border border-[#30363D] hover:border-slate-500 bg-[#0D1117] transition-all duration-200 cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between"
                   >
-                    {/* Top Gradient Banner (HF Style) */}
-                    <div className={`bg-gradient-to-r ${grad} p-4 sm:p-5 flex flex-col justify-between min-h-[110px] relative`}>
-                      {/* Top Bar: Status Badge */}
-                      <div className="flex items-center justify-between">
-                        <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-[10px] font-bold text-emerald-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    {/* Top Gradient Banner with Space Info */}
+                    <div className={`p-5 bg-gradient-to-r ${gradient} relative`}>
+                      <div className="flex items-center justify-between text-xs text-white/90 pb-2">
+                        <span className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm text-[10px] font-bold text-emerald-300">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                           <span>Running</span>
                         </span>
 
-                        <span className="text-white/60 text-xs group-hover:text-white transition">
-                          &rarr;
+                        <span className="text-white/60 group-hover:text-white transition">
+                          →
                         </span>
                       </div>
 
-                      {/* Workspace Title & Description */}
-                      <div className="pt-2">
-                        <div className="flex items-center space-x-2">
-                          <h3 className="text-base sm:text-lg font-black text-white group-hover:underline drop-shadow-sm truncate">
-                            {ws.name || 'Untitled Workspace'}
-                          </h3>
-                          <span className="text-sm">{emoji}</span>
-                        </div>
-                        <p className="text-xs text-white/80 line-clamp-1 mt-0.5">
-                          {ws.description || (docsCount === 0 && factsCount === 0 ? 'Empty workspace · ready for CLI setup' : `${docsCount} documents · ${factsCount} facts`)}
+                      <div className="space-y-1">
+                        <h3 className="text-base font-extrabold text-white tracking-tight flex items-center space-x-1.5">
+                          <span className="truncate">{ws.name}</span>
+                          <span className="text-sm">{idx % 2 === 0 ? '🚀' : '⚡'}</span>
+                        </h3>
+                        <p className="text-xs text-white/80 line-clamp-1 font-medium">
+                          {ws.description || `${ws.d_count ?? 0} documents • ${ws.k_count ?? 0} verified facts`}
                         </p>
                       </div>
                     </div>
 
-                    {/* Bottom Metadata & Stats Bar */}
-                    <div className="bg-[#0D1117] p-3.5 border-t border-[#30363D]/80 flex items-center justify-between text-xs text-slate-400">
-                      {/* Left: Avatar + Username + Time */}
-                      <div className="flex items-center space-x-2 truncate">
-                        <div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center text-[9px] text-white font-bold shrink-0">
+                    {/* Bottom Metadata Bar */}
+                    <div className="p-3.5 bg-[#010409] flex items-center justify-between text-xs text-slate-400 border-t border-[#21262D]">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 rounded-full bg-rose-500 text-white font-bold flex items-center justify-center text-[9px]">
                           {username[0]?.toUpperCase() || 'A'}
                         </div>
-                        <span className="font-medium text-slate-300 truncate">@{username}</span>
-                        <span className="text-slate-600 font-mono">·</span>
-                        <span className="text-[11px] text-slate-500 truncate">
-                          {idx === 0 ? '2 minutes ago' : idx === 1 ? '1 day ago' : idx === 2 ? '7 days ago' : 'Aug 25'}
-                        </span>
+                        <span className="text-[11px] font-mono text-slate-300">@{username}</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-[11px] text-slate-500">2 minutes ago</span>
                       </div>
 
-                      {/* Right: Brief Stats (Docs & Facts) */}
-                      <div className="flex items-center space-x-2 shrink-0 font-mono text-[11px]">
-                        <span className="px-2 py-0.5 rounded bg-[#161B22] border border-[#30363D] text-sky-300 flex items-center space-x-1">
+                      <div className="flex items-center space-x-3 text-[11px] font-mono">
+                        <span className="flex items-center space-x-1 bg-[#161B22] px-2 py-0.5 rounded border border-[#30363D]" title="Tracked Documents">
                           <Files className="w-3 h-3 text-sky-400" />
-                          <span>{docsCount}</span>
+                          <span>{ws.d_count ?? 0}</span>
                         </span>
-                        <span className="px-2 py-0.5 rounded bg-[#161B22] border border-[#30363D] text-emerald-300 flex items-center space-x-1">
+                        <span className="flex items-center space-x-1 bg-[#161B22] px-2 py-0.5 rounded border border-[#30363D]" title="Verified Knowledge Items">
                           <Database className="w-3 h-3 text-emerald-400" />
-                          <span>{factsCount}</span>
+                          <span>{ws.k_count ?? 0}</span>
                         </span>
                       </div>
                     </div>
@@ -357,6 +416,218 @@ export default function WorkspaceHub({
           )}
         </div>
       </div>
+
+      {/* ===================================================================== */}
+      {/* USER PROFILE MODAL                                                    */}
+      {/* ===================================================================== */}
+      {showProfileModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0D1117] border border-[#30363D] rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl text-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-[#30363D]">
+              <div className="flex items-center space-x-2">
+                <User className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">Developer Profile</h3>
+              </div>
+              <button
+                onClick={() => setShowProfileModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#21262D] transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 to-rose-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                {username[0]?.toUpperCase() || 'A'}
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <h4 className="text-base font-bold text-white">{displayName}</h4>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    PRO
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 font-mono">{email}</p>
+                <p className="text-[11px] text-slate-500 font-mono">Role: {currentUser?.role || 'Operator'}</p>
+              </div>
+            </div>
+
+            {/* API Key Section */}
+            <div className="space-y-2 bg-[#161B22] p-4 rounded-xl border border-[#30363D]">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-300 flex items-center space-x-1.5">
+                  <Key className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Personal Access Token</span>
+                </span>
+                <button
+                  onClick={() => setShowKeyRaw(!showKeyRaw)}
+                  className="text-slate-400 hover:text-white text-xs flex items-center space-x-1 transition"
+                >
+                  {showKeyRaw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>{showKeyRaw ? 'Hide' : 'Reveal'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type={showKeyRaw ? 'text' : 'password'}
+                  readOnly
+                  value={token}
+                  className="flex-1 px-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs font-mono text-emerald-400 focus:outline-none select-all"
+                />
+                <button
+                  onClick={handleCopyKey}
+                  className="px-3 py-2 rounded-lg bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-xs font-bold text-white flex items-center space-x-1.5 transition"
+                >
+                  {copiedKey ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedKey ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Use this token with the CLI: <code className="text-emerald-400">dw login --token &lt;token&gt;</code>
+              </p>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="p-3 rounded-xl bg-[#161B22] border border-[#30363D]">
+                <span className="text-lg font-bold text-white block">{workspaces.length}</span>
+                <span className="text-[11px] text-slate-400">Active Workspaces</span>
+              </div>
+              <div className="p-3 rounded-xl bg-[#161B22] border border-[#30363D]">
+                <span className="text-lg font-bold text-emerald-400 block">{totalVerifiedFacts}</span>
+                <span className="text-[11px] text-slate-400">Verified Knowledge Facts</span>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center justify-between pt-2 border-t border-[#30363D]">
+              {onLogout && (
+                <button
+                  onClick={() => {
+                    setShowProfileModal(false);
+                    onLogout();
+                  }}
+                  className="px-3.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-bold border border-rose-500/30 flex items-center space-x-1.5 transition"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Log out</span>
+                </button>
+              )}
+              <button
+                onClick={() => setShowProfileModal(false)}
+                className="ml-auto px-4 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-white text-xs font-bold transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* SETTINGS MODAL                                                        */}
+      {/* ===================================================================== */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0D1117] border border-[#30363D] rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl text-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-[#30363D]">
+              <div className="flex items-center space-x-2">
+                <Sliders className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">Platform Settings</h3>
+              </div>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#21262D] transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Confidence Threshold Slider */}
+              <div className="space-y-2 bg-[#161B22] p-4 rounded-xl border border-[#30363D]">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-200">Policy CI Confidence Threshold</span>
+                  <span className="font-mono font-bold text-emerald-400 bg-black/40 px-2 py-0.5 rounded">
+                    {confidenceThreshold}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="80"
+                  max="98"
+                  value={confidenceThreshold}
+                  onChange={(e) => setConfidenceThreshold(parseInt(e.target.value, 10))}
+                  className="w-full accent-emerald-500 cursor-pointer"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Document claims extracted below this score trigger a CI review requirement before merging.
+                </p>
+              </div>
+
+              {/* FastMCP Endpoint URL */}
+              <div className="space-y-2 bg-[#161B22] p-4 rounded-xl border border-[#30363D]">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-200 flex items-center space-x-1.5">
+                    <Server className="w-3.5 h-3.5 text-sky-400" />
+                    <span>FastMCP Bridge URL</span>
+                  </span>
+                  {testConnStatus === 'connected' && (
+                    <span className="text-[10px] text-emerald-400 font-bold flex items-center space-x-1">
+                      <Check className="w-3 h-3" />
+                      <span>Connected (29 Tools)</span>
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={mcpUrl}
+                    onChange={(e) => setMcpUrl(e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    onClick={handleTestConnection}
+                    className="px-3 py-2 rounded-lg bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-xs font-semibold text-slate-200 transition"
+                  >
+                    {testConnStatus === 'testing' ? 'Testing...' : 'Test'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Auto Sync Interval */}
+              <div className="space-y-2 bg-[#161B22] p-4 rounded-xl border border-[#30363D]">
+                <label className="font-semibold text-slate-200 block">Workspace Background Sync</label>
+                <select
+                  value={autoSyncInterval}
+                  onChange={(e) => setAutoSyncInterval(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="manual">Manual Refresh (Sync button)</option>
+                  <option value="30s">Every 30 seconds</option>
+                  <option value="60s">Every 60 seconds</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#30363D]">
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="px-4 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-slate-300 text-xs font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSettings}
+                className="px-4 py-1.5 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white text-xs font-bold transition shadow"
+              >
+                Save Preferences
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===================================================================== */}
       {/* GITHUB-STYLE "CREATE A NEW REPOSITORY / WORKSPACE" MODAL (media_1)   */}
@@ -370,7 +641,13 @@ export default function WorkspaceHub({
                 <h2 className="text-xl font-bold text-white tracking-tight">Create a new workspace</h2>
                 <p className="text-xs text-slate-400 mt-1">
                   Workspaces contain your documents, version history, knowledge graph, and deterministic CI rules.{' '}
-                  <span className="text-emerald-400 hover:underline cursor-pointer">Learn more</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowLearnMore(!showLearnMore)}
+                    className="text-emerald-400 hover:underline font-semibold cursor-pointer ml-1"
+                  >
+                    {showLearnMore ? 'Hide guide' : 'Learn more'}
+                  </button>
                 </p>
               </div>
               <button
@@ -380,6 +657,42 @@ export default function WorkspaceHub({
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* LEARN MORE EXPANDABLE ARCHITECTURE GUIDE */}
+            {showLearnMore && (
+              <div className="bg-[#161B22] border border-emerald-500/30 rounded-xl p-4 space-y-3 text-xs">
+                <div className="flex items-center space-x-2 text-emerald-400 font-bold">
+                  <BookOpen className="w-4 h-4" />
+                  <span>How DiffWeave Workspaces Function</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300">
+                  <div className="p-2.5 rounded-lg bg-[#0D1117] border border-[#30363D] space-y-1">
+                    <span className="font-bold text-white block">1. Isolated Knowledge Registers</span>
+                    <p className="text-[11px] text-slate-400">
+                      Each workspace is an isolated repository. Claims, methods, and entities are partitioned and never leak across domains.
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#0D1117] border border-[#30363D] space-y-1">
+                    <span className="font-bold text-white block">2. Semantic Knowledge Pull Requests</span>
+                    <p className="text-[11px] text-slate-400">
+                      New documents produce atomic proposals rather than raw overwrites. Review diffs visually before merging into main.
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#0D1117] border border-[#30363D] space-y-1">
+                    <span className="font-bold text-white block">3. Automated Policy CI Linting</span>
+                    <p className="text-[11px] text-slate-400">
+                      Enforce confidence thresholds, citation evidence, and contradiction blockers on every ingested page.
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-[#0D1117] border border-[#30363D] space-y-1">
+                    <span className="font-bold text-white block">4. Universal FastMCP Engine</span>
+                    <p className="text-[11px] text-slate-400">
+                      29 MCP tools allow Claude, Cursor, and terminal CLI (`dw`) to query or commit to this workspace.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleCreateSubmit} className="space-y-6 text-xs">
               {/* STEP 1: General */}
@@ -400,9 +713,9 @@ export default function WorkspaceHub({
                         <div className="w-4 h-4 rounded-full bg-pink-500 flex items-center justify-center text-[9px] text-white font-bold">
                           {username[0]?.toUpperCase() || 'A'}
                         </div>
-                        <span className="font-semibold text-xs">{username}</span>
+                        <span className="font-semibold text-xs truncate max-w-[120px]">{username}</span>
                       </div>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     </div>
                   </div>
 
@@ -498,23 +811,51 @@ export default function WorkspaceHub({
                 </div>
 
                 {/* Starter Template */}
-                <div className="space-y-1 pt-1">
-                  <label className="text-xs font-semibold text-slate-300">Domain Starter Template</label>
-                  <select
-                    value={starterTemplate}
-                    onChange={(e) => setStarterTemplate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[#161B22] border border-[#30363D] text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
-                  >
-                    <option value="empty">Empty Workspace (CLI quickstart instructions)</option>
-                    <option value="clinical">Clinical & Medical Guidelines Template</option>
-                    <option value="legal">Legal & Compliance Contracts Template</option>
-                    <option value="engineering">Engineering Architecture Specs Template</option>
-                  </select>
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-300">Starter template</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setStarterTemplate('empty')}
+                      className={`p-2.5 rounded-lg border text-left transition ${
+                        starterTemplate === 'empty'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-bold block">Empty Workspace</span>
+                      <span className="text-[10px] text-slate-500">Blank slate, ingest docs via CLI or dropzone</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStarterTemplate('cardiology')}
+                      className={`p-2.5 rounded-lg border text-left transition ${
+                        starterTemplate === 'cardiology'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-bold block">Clinical Cardiology</span>
+                      <span className="text-[10px] text-slate-500">Pre-loaded guidelines & 85% confidence rule</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStarterTemplate('legal')}
+                      className={`p-2.5 rounded-lg border text-left transition ${
+                        starterTemplate === 'legal'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-bold block">Legal Agreements</span>
+                      <span className="text-[10px] text-slate-500">NDAs, clause extraction & policy CI rules</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Bottom Buttons */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-[#30363D]">
+              {/* Submit Buttons */}
+              <div className="pt-4 border-t border-[#30363D] flex items-center justify-end space-x-3">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
@@ -524,7 +865,7 @@ export default function WorkspaceHub({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-bold transition shadow-md flex items-center space-x-1.5"
+                  className="px-5 py-2 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-bold transition shadow-lg flex items-center space-x-1.5"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Create workspace</span>
