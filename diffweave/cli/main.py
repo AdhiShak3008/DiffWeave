@@ -4,6 +4,14 @@ A Git-like developer interface for DocWeave document intelligence.
 """
 from __future__ import annotations
 
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 import typer
 from rich.console import Console
 

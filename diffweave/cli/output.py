@@ -3,6 +3,14 @@ Terminal output formatting utilities for DiffWeave CLI using Rich.
 """
 from __future__ import annotations
 
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 import json
 from typing import Any
 from rich.console import Console

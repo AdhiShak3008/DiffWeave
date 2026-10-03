@@ -20,12 +20,12 @@ def login_command(
     password: Optional[str] = typer.Option(None, "--password", "-p", help="DocWeave user password"),
     token: Optional[str] = typer.Option(None, "--token", "-t", "--api-key", "-k", help="Personal Access Token or API Key"),
     demo: bool = typer.Option(False, "--demo", help="Log in instantly using demo evaluator account"),
-    url: Optional[str] = typer.Option(None, "--url", help="DocWeave Server URL (default: http://localhost:8000 or DOCWEAVE_MCP_URL)"),
+    url: Optional[str] = typer.Option(None, "--url", help="DocWeave Server URL (default: https://shak3008-diffweave.hf.space or DOCWEAVE_MCP_URL)"),
 ):
     """
     Authenticate with DocWeave and securely store credentials.
     """
-    server_url = url or os.environ.get("DOCWEAVE_MCP_URL") or "http://localhost:8000"
+    server_url = url or os.environ.get("DOCWEAVE_MCP_URL") or "https://shak3008-diffweave.hf.space"
     server_url = server_url.rstrip("/")
 
     # 1. Direct Token Login
