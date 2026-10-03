@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import React, { useState } from 'react';
 import {
   GitPullRequest,
@@ -17,11 +18,19 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function PRReviewDeck({ proposals, onReviewProposal, onBatchReview, loading }) {
+export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatchReview, loading, workspaceId, selectedProposalId }) {
   const [selectedProposal, setSelectedProposal] = useState(null);
   const [filterStatus, setFilterStatus] = useState('PENDING');
   const [reviewComment, setReviewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Auto-select proposal from URL if provided
+  React.useEffect(() => {
+    if (selectedProposalId && proposals?.length) {
+      const match = proposals.find((p) => p.id === selectedProposalId || p.id.startsWith(selectedProposalId));
+      if (match) setSelectedProposal(match);
+    }
+  }, [selectedProposalId, proposals]);
+
 
   if (loading) {
     return (
@@ -109,10 +118,11 @@ export default function PRReviewDeck({ proposals, onReviewProposal, onBatchRevie
               const conf = Math.round((changes.confidence || (changes.proposed?.confidence) || 0.95) * 100);
 
               return (
-                <div
+                <Link
                   key={pr.id}
+                  to={`/workspaces/${workspaceId || 'default'}/prs/${pr.id}`}
                   onClick={() => setSelectedProposal(pr)}
-                  className={`p-3.5 rounded-xl border transition cursor-pointer text-xs ${
+                  className={`p-3.5 rounded-xl border transition cursor-pointer text-xs block no-underline ${
                     isSelected
                       ? 'bg-[#121828] border-emerald-500/50 shadow-md shadow-emerald-500/5'
                       : 'bg-[#0D121F] border-slate-800 hover:border-slate-700'
@@ -144,7 +154,7 @@ export default function PRReviewDeck({ proposals, onReviewProposal, onBatchRevie
                     <span>{pr.proposal_type} DELTA</span>
                     <span>{pr.created_at ? new Date(pr.created_at).toLocaleTimeString() : 'Just now'}</span>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

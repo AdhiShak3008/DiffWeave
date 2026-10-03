@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext.jsx';
 import {
   FileDiff,
   GitPullRequest,
@@ -23,24 +25,26 @@ import {
   Sparkles,
   Terminal,
   Grid,
-  ArrowLeft
+  ArrowLeft,
+  Sun,
+  Moon,
+  Settings
 } from 'lucide-react';
 
 export default function Navbar({
   workspaces,
   currentWorkspace,
   onSelectWorkspace,
-  onOpenHub,
   onCreateWorkspace,
   activeTab,
   onSelectTab,
   stats,
   currentUser,
-  onOpenAuth,
   onLogout,
   onRefresh,
-  refreshing,
+  refreshing
 }) {
+  const { theme, toggleTheme } = useTheme();
   const [showWsDropdown, setShowWsDropdown] = useState(false);
   const [copiedApiKey, setCopiedApiKey] = useState(false);
 
@@ -93,50 +97,51 @@ export default function Navbar({
   const pendingProposals = stats?.pending_proposals ?? 0;
 
   const tabs = [
-    { id: 'diff', label: 'Semantic Diff', icon: FileDiff, badge: pendingProposals > 0 ? `${pendingProposals}` : undefined },
-    { id: 'prs', label: 'Knowledge PRs', icon: GitPullRequest, badge: pendingProposals > 0 ? `${pendingProposals}` : undefined },
-    { id: 'graph', label: 'Topology Graph', icon: Network },
-    { id: 'staging', label: 'Documents & Staging', icon: Files, badge: totalDocs > 0 ? `${totalDocs}` : undefined },
-    { id: 'rules', label: 'Policy CI Rules', icon: ShieldCheck },
-    { id: 'knowledge', label: 'Master Truth Register', icon: Database, badge: verifiedFacts > 0 ? `${verifiedFacts}` : undefined },
-    { id: 'audit', label: 'Audit Trail', icon: History },
+    { id: 'diff', label: 'Semantic Diff', icon: FileDiff, badge: pendingProposals > 0 ? `${pendingProposals}` : null },
+    { id: 'prs', label: 'PR Review Deck', icon: GitPullRequest, badge: pendingProposals > 0 ? `${pendingProposals} pending` : null },
+    { id: 'graph', label: 'Knowledge Graph', icon: Network },
+    { id: 'staging', label: 'Ingestion Staging', icon: Files, badge: totalDocs > 0 ? `${totalDocs} docs` : null },
+    { id: 'rules', label: 'Policy Rules CI', icon: ShieldCheck },
+    { id: 'knowledge', label: 'Truth Register', icon: Database, badge: verifiedFacts > 0 ? `${verifiedFacts} facts` : null },
+    { id: 'audit', label: 'Audit & Provenance', icon: History },
     { id: 'quickstart', label: 'CLI Quickstart', icon: Terminal },
   ];
 
   return (
-    <header className="w-full bg-[#0D1117] border-b border-[#30363D] text-slate-100 select-none">
+    <header className="sticky top-0 z-40 bg-[#010409] border-b border-[#30363D] shadow-md select-none">
       {/* --------------------------------------------------------------------- */}
-      {/* TIER 1: Global Platform Bar (#010409)                                 */}
+      {/* TIER 1: Global Platform Bar (#010409)                                  */}
       {/* --------------------------------------------------------------------- */}
-      <div className="bg-[#010409] border-b border-[#30363D] px-4 sm:px-6 py-2.5 flex items-center justify-between text-xs">
-        {/* Left: Brand & Workspace Selector */}
-        <div className="flex items-center space-x-3">
-          {/* DiffWeave Logo (Navigates to Hub) */}
-          <div
-            onClick={onOpenHub}
+      <div className="px-4 sm:px-6 py-2.5 flex items-center justify-between border-b border-[#21262D]">
+        {/* Left: Brand Logo & Workspace Switcher */}
+        <div className="flex items-center space-x-4">
+          <Link
+            to="/"
+            onClick={() => onSelectWorkspace && onSelectWorkspace(null)}
             className="flex items-center space-x-2.5 cursor-pointer group"
             title="Return to Workspaces Hub"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 via-teal-500 to-sky-500 p-0.5 shadow-md group-hover:scale-105 transition">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 via-teal-500 to-sky-500 p-[1px] shadow-sm group-hover:scale-105 transition">
               <div className="w-full h-full bg-[#010409] rounded-[6px] flex items-center justify-center">
                 <Layers className="w-4 h-4 text-emerald-400" />
               </div>
             </div>
             <div className="flex flex-col">
-              <span className="font-extrabold text-sm text-white tracking-tight group-hover:text-emerald-400 transition">
+              <span className="font-extrabold text-sm text-white tracking-tight group-hover:text-emerald-300 transition">
                 DiffWeave
               </span>
               <span className="text-[10px] text-slate-400 font-mono -mt-1">
                 Document Git Platform
               </span>
             </div>
-          </div>
+          </Link>
 
           <span className="text-slate-600 hidden sm:inline">/</span>
 
-          {/* Hub Button */}
-          <button
-            onClick={onOpenHub}
+          {/* Hub Link Button */}
+          <Link
+            to="/"
+            onClick={() => onSelectWorkspace && onSelectWorkspace(null)}
             className={`hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold transition ${
               !currentWorkspace
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
@@ -145,7 +150,7 @@ export default function Navbar({
           >
             <Grid className="w-3.5 h-3.5" />
             <span>Workspaces</span>
-          </button>
+          </Link>
 
           {/* Workspace Dropdown */}
           <div ref={wsDropdownRef} className="relative">
@@ -154,7 +159,7 @@ export default function Navbar({
                 setShowWsDropdown((prev) => !prev);
                 setShowUserDropdown(false);
               }}
-              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-200 transition font-medium"
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-200 transition"
             >
               <span className={`w-2 h-2 rounded-full ${currentWorkspace ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
               <span className="truncate max-w-[150px] text-xs font-semibold">
@@ -165,46 +170,35 @@ export default function Navbar({
 
             {showWsDropdown && (
               <div className="absolute left-0 mt-1.5 w-64 bg-[#161B22] border border-[#30363D] rounded-xl shadow-2xl p-2 z-50 space-y-1">
-                {/* Option to go to Hub */}
-                <button
-                  onClick={() => {
-                    onOpenHub();
-                    setShowWsDropdown(false);
-                  }}
-                  className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center space-x-2 text-emerald-400 hover:bg-[#21262D] font-bold pb-2 border-b border-[#30363D]"
-                >
-                  <Grid className="w-3.5 h-3.5" />
-                  <span>View All Workspaces (Hub)</span>
-                </button>
-
-                <div className="text-[10px] font-bold text-slate-400 px-2 pt-2 pb-1 uppercase tracking-wider">
-                  Workspaces ({workspaces.length})
+                <div className="px-2 py-1 text-[11px] font-semibold text-slate-400 border-b border-[#30363D]">
+                  Document Workspaces ({workspaces.length})
                 </div>
 
-                <div className="max-h-60 overflow-y-auto space-y-0.5">
+                <div className="max-h-56 overflow-y-auto space-y-0.5 py-1">
                   {workspaces.map((w) => (
-                    <button
+                    <Link
                       key={w.id}
+                      to={`/workspaces/${w.id}/diff`}
                       onClick={() => {
-                        onSelectWorkspace(w);
                         setShowWsDropdown(false);
+                        onSelectWorkspace && onSelectWorkspace(w);
                       }}
                       className={`w-full text-left px-2.5 py-1.5 rounded text-xs transition flex items-center justify-between ${
                         currentWorkspace?.id === w.id
                           ? 'bg-emerald-500/20 text-emerald-300 font-bold'
-                          : 'text-slate-300 hover:bg-[#21262D]'
+                          : 'text-slate-300 hover:bg-[#21262D] hover:text-white'
                       }`}
                     >
-                      <div className="flex flex-col truncate pr-2">
-                        <span className="truncate font-semibold">{w.name}</span>
-                        <span className="text-[10px] text-slate-400 font-normal truncate">
-                          {w.d_count ?? 0} docs · {w.k_count ?? 0} facts
+                      <div className="truncate pr-2">
+                        <p className="truncate">{w.name}</p>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {w.d_count ?? 0} docs &bull; {w.k_count ?? 0} facts
                         </span>
                       </div>
                       {currentWorkspace?.id === w.id && (
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       )}
-                    </button>
+                    </Link>
                   ))}
                 </div>
 
@@ -225,14 +219,28 @@ export default function Navbar({
           </div>
         </div>
 
-        {/* Right: FastMCP Bridge status & User Profile */}
-        <div className="flex items-center space-x-3">
+        {/* Right: FastMCP Bridge status, Theme Quick Toggle & User Profile */}
+        <div className="flex items-center space-x-2.5">
           {/* FastMCP Connected Pill */}
           <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#161B22] border border-[#30363D] text-[11px] text-slate-400 font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 " />
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
             <Cpu className="w-3 h-3 text-emerald-400" />
             <span>FastMCP: Active</span>
           </div>
+
+          {/* Quick Light/Dark Mode Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 rounded-lg bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white transition flex items-center justify-center"
+            title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            aria-label="Toggle interface theme"
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-indigo-400" />
+            )}
+          </button>
 
           {/* User Menu */}
           {currentUser ? (
@@ -259,53 +267,65 @@ export default function Navbar({
                     <p className="font-bold text-white">{currentUser.username || 'User'}</p>
                     <p className="text-[11px] text-slate-400 font-mono truncate">{currentUser.email || 'user@docweave.io'}</p>
                   </div>
-                  <button
-                    onClick={() => {
-                      setShowUserDropdown(false);
-                      onOpenHub();
-                    }}
+                  <Link
+                    to="/"
+                    onClick={() => setShowUserDropdown(false)}
                     className="w-full text-left px-2 py-1.5 rounded text-slate-300 hover:bg-[#21262D] flex items-center space-x-2"
                   >
                     <Grid className="w-3.5 h-3.5 text-sky-400" />
                     <span>Workspaces Hub</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowUserDropdown(false);
-                      const tok = localStorage.getItem("diffweave_token") || localStorage.getItem("token") || "";
-                      if (tok) {
-                        navigator.clipboard.writeText(tok);
-                        alert("Personal Access Token / API Key copied to clipboard!");
-                      } else {
-                        alert("No active API token found.");
-                      }
-                    }}
+                  </Link>
+                  <Link
+                    to="/profile"
+                    onClick={() => setShowUserDropdown(false)}
                     className="w-full text-left px-2 py-1.5 rounded text-slate-300 hover:bg-[#21262D] flex items-center space-x-2"
                   >
-                    <Key className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Copy API Key</span>
-                  </button>
+                    <User className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Developer Profile</span>
+                  </Link>
+                  <Link
+                    to="/settings"
+                    onClick={() => setShowUserDropdown(false)}
+                    className="w-full text-left px-2 py-1.5 rounded text-slate-300 hover:bg-[#21262D] flex items-center space-x-2"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Platform Settings</span>
+                  </Link>
                   <button
                     onClick={() => {
                       setShowUserDropdown(false);
-                      onLogout();
+                      handleCopyApiKey();
                     }}
-                    className="w-full text-left px-2 py-1.5 rounded text-rose-400 hover:bg-rose-500/10 flex items-center space-x-2"
+                    className="w-full text-left px-2 py-1.5 rounded text-slate-300 hover:bg-[#21262D] flex items-center justify-between"
                   >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Log out</span>
+                    <div className="flex items-center space-x-2">
+                      <Key className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{copiedApiKey ? 'Copied Token!' : 'Copy API Key'}</span>
+                    </div>
+                    {copiedApiKey && <span className="text-[10px] text-emerald-400 font-bold">&check;</span>}
                   </button>
+                  <div className="pt-1 border-t border-[#30363D]">
+                    <button
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        onLogout();
+                      }}
+                      className="w-full text-left px-2 py-1.5 rounded text-rose-400 hover:bg-rose-950/30 flex items-center space-x-2"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           ) : (
-            <button
-              onClick={() => { window.location.href = "/login"; }}
-              className="flex items-center space-x-1.5 px-3 py-1 rounded-md bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition shadow"
+            <Link
+              to="/login"
+              className="px-3 py-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-md transition"
             >
-              <Lock className="w-3 h-3" />
-              <span>Sign in with DocWeave</span>
-            </button>
+              Sign In
+            </Link>
           )}
         </div>
       </div>
@@ -318,13 +338,14 @@ export default function Navbar({
           <div className="px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {/* Workspace Title & Badge */}
             <div className="flex items-center space-x-2.5">
-              <button
-                onClick={onOpenHub}
+              <Link
+                to="/"
+                onClick={() => onSelectWorkspace && onSelectWorkspace(null)}
                 className="p-1 rounded-md hover:bg-[#161B22] text-slate-400 hover:text-white transition"
                 title="Back to All Workspaces"
               >
                 <ArrowLeft className="w-4 h-4" />
-              </button>
+              </Link>
               <Files className="w-5 h-5 text-emerald-400" />
               <div className="flex items-center space-x-2">
                 <span className="text-white font-bold text-base sm:text-lg">
@@ -347,28 +368,31 @@ export default function Navbar({
               <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
                 <Database className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Verified Truth:</span>
-                <span className="text-white font-bold font-mono">{verifiedFacts} Facts</span>
+                <span className="text-white font-bold font-mono">{verifiedFacts}</span>
               </div>
 
-              <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-[#161B22] border border-[#30363D] text-slate-300">
-                <GitPullRequest className="w-3.5 h-3.5 text-amber-400" />
-                <span>Pending PRs:</span>
-                <span className="text-amber-400 font-bold font-mono">{pendingProposals}</span>
-              </div>
+              <button
+                onClick={onRefresh}
+                className="p-1.5 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-400 hover:text-white transition"
+                title="Refresh Workspace Data"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-emerald-400' : ''}`} />
+              </button>
             </div>
           </div>
 
           {/* ----------------------------------------------------------------- */}
-          {/* TIER 3: Knowledge Git Tabs                                       */}
+          {/* TIER 3: Workspace Navigation Tabs (GitHub-style deep Link tabs)   */}
           {/* ----------------------------------------------------------------- */}
-          <nav className="px-4 sm:px-6 flex space-x-1 overflow-x-auto text-xs font-semibold no-scrollbar">
+          <nav className="flex px-4 sm:px-6 space-x-1 overflow-x-auto border-t border-[#21262D] text-xs font-medium no-scrollbar">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
-                <button
+                <Link
                   key={tab.id}
-                  onClick={() => onSelectTab(tab.id)}
+                  to={`/workspaces/${currentWorkspace.id}/${tab.id}`}
+                  onClick={() => onSelectTab && onSelectTab(tab.id)}
                   className={`flex items-center space-x-2 px-3.5 py-2.5 border-b-2 transition whitespace-nowrap ${
                     isActive
                       ? 'border-emerald-500 text-white font-bold'
@@ -388,7 +412,7 @@ export default function Navbar({
                       {tab.badge}
                     </span>
                   )}
-                </button>
+                </Link>
               );
             })}
           </nav>

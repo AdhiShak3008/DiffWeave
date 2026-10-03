@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext.jsx';
 import {
   Layers,
   Search,
@@ -30,7 +32,9 @@ import {
   LogOut,
   Info,
   Server,
-  Key
+  Key,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 const GRADIENTS = [
@@ -50,6 +54,9 @@ export default function WorkspaceHub({
   currentUser,
   onLogout
 }) {
+    const { theme, setTheme } = useTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('updated'); // updated, docs, facts, name
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -358,10 +365,11 @@ export default function WorkspaceHub({
                 const isSelected = currentWorkspace?.id === ws.id;
 
                 return (
-                  <div
+                  <Link
                     key={ws.id || idx}
-                    onClick={() => onSelectWorkspace(ws)}
-                    className="group relative rounded-2xl overflow-hidden border border-[#30363D] hover:border-slate-500 bg-[#0D1117] transition-all duration-200 cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between"
+                    to={`/workspaces/${ws.id}/diff`}
+                    onClick={() => onSelectWorkspace && onSelectWorkspace(ws)}
+                    className="group relative rounded-2xl overflow-hidden border border-[#30363D] hover:border-slate-500 bg-[#0D1117] transition-all duration-200 cursor-pointer shadow-lg hover:shadow-2xl flex flex-col justify-between block no-underline"
                   >
                     {/* Top Gradient Banner with Space Info */}
                     <div className={`p-5 bg-gradient-to-r ${gradient} relative`}>
@@ -409,7 +417,7 @@ export default function WorkspaceHub({
                         </span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -420,7 +428,7 @@ export default function WorkspaceHub({
       {/* ===================================================================== */}
       {/* USER PROFILE MODAL                                                    */}
       {/* ===================================================================== */}
-      {showProfileModal && (
+      {(showProfileModal || location.pathname === '/profile') && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0D1117] border border-[#30363D] rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl text-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-[#30363D]">
@@ -429,7 +437,7 @@ export default function WorkspaceHub({
                 <h3 className="text-base font-bold text-white">Developer Profile</h3>
               </div>
               <button
-                onClick={() => setShowProfileModal(false)}
+                onClick={() => { setShowProfileModal(false); if (location.pathname === "/profile") navigate("/"); }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#21262D] transition"
               >
                 <X className="w-5 h-5" />
@@ -515,7 +523,7 @@ export default function WorkspaceHub({
                 </button>
               )}
               <button
-                onClick={() => setShowProfileModal(false)}
+                onClick={() => { setShowProfileModal(false); if (location.pathname === "/profile") navigate("/"); }}
                 className="ml-auto px-4 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-white text-xs font-bold transition"
               >
                 Close
@@ -528,7 +536,7 @@ export default function WorkspaceHub({
       {/* ===================================================================== */}
       {/* SETTINGS MODAL                                                        */}
       {/* ===================================================================== */}
-      {showSettingsModal && (
+      {(showSettingsModal || location.pathname === '/settings') && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#0D1117] border border-[#30363D] rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl text-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-[#30363D]">
@@ -537,14 +545,55 @@ export default function WorkspaceHub({
                 <h3 className="text-base font-bold text-white">Platform Settings</h3>
               </div>
               <button
-                onClick={() => setShowSettingsModal(false)}
+                onClick={() => { setShowSettingsModal(false); if (location.pathname === "/settings") navigate("/"); }}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-[#21262D] transition"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-4 text-xs">
+                        <div className="space-y-4 text-xs">
+              {/* Interface Theme Toggle */}
+              <div className="space-y-2 bg-[#161B22] p-4 rounded-xl border border-[#30363D]">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-200 flex items-center space-x-1.5">
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Interface Theme</span>
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold uppercase">
+                    {theme} Mode Active
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Select your preferred appearance for semantic diffs, knowledge graphs, and doc staging.
+                </p>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setTheme('dark')}
+                    className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center space-x-2 transition ${
+                      theme === 'dark'
+                        ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 font-bold shadow-sm'
+                        : 'bg-[#0D1117] border-[#30363D] text-slate-400 hover:text-slate-200 hover:bg-[#21262D]'
+                    }`}
+                  >
+                    <Moon className="w-4 h-4 text-indigo-400" />
+                    <span>Dark Mode</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTheme('light')}
+                    className={`px-3 py-2 rounded-lg border text-xs font-semibold flex items-center justify-center space-x-2 transition ${
+                      theme === 'light'
+                        ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300 font-bold shadow-sm'
+                        : 'bg-[#0D1117] border-[#30363D] text-slate-400 hover:text-slate-200 hover:bg-[#21262D]'
+                    }`}
+                  >
+                    <Sun className="w-4 h-4 text-amber-400" />
+                    <span>Light Mode</span>
+                  </button>
+                </div>
+              </div>
               {/* Confidence Threshold Slider */}
               <div className="space-y-2 bg-[#161B22] p-4 rounded-xl border border-[#30363D]">
                 <div className="flex items-center justify-between">
@@ -613,7 +662,7 @@ export default function WorkspaceHub({
 
             <div className="flex items-center justify-end space-x-2 pt-2 border-t border-[#30363D]">
               <button
-                onClick={() => setShowSettingsModal(false)}
+                onClick={() => { setShowSettingsModal(false); if (location.pathname === "/settings") navigate("/"); }}
                 className="px-4 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-slate-300 text-xs font-medium transition"
               >
                 Cancel

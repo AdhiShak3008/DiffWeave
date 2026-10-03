@@ -527,3 +527,149 @@ code, pre, .font-mono {
   color: #10B981;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
+
+/* ========================================================================= */
+/* LIGHT THEME SYSTEM (Triggered when html element has class "light")        */
+/* ========================================================================= */
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #F8FAFC !important;
+  color: #0F172A !important;
+}
+
+/* Base dark container overrides */
+html.light .bg-\[\#080B11\],
+html.light .bg-\[\#0A0D14\],
+html.light .bg-\[\#0D1117\],
+html.light .bg-\[\#0D121F\],
+html.light .bg-\[\#010409\] {
+  background-color: #F8FAFC !important;
+}
+
+/* Card and surface containers */
+html.light .bg-\[\#161B22\],
+html.light .bg-\[\#141B2D\],
+html.light .bg-\[\#121828\] {
+  background-color: #FFFFFF !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Sub-card & hovered pill backgrounds */
+html.light .bg-\[\#21262D\],
+html.light .bg-\[\#21262D\]\/70,
+html.light .hover\:bg-\[\#21262D\]:hover,
+html.light .hover\:bg-\[\#161B22\]:hover {
+  background-color: #F1F5F9 !important;
+}
+
+/* Border overrides */
+html.light .border-\[\#30363D\],
+html.light .border-\[\#21262D\],
+html.light .border-slate-800,
+html.light .border-slate-800\/80,
+html.light .border-slate-900 {
+  border-color: #E2E8F0 !important;
+}
+
+/* Primary and high-contrast text */
+html.light .text-white,
+html.light .text-slate-100,
+html.light .text-slate-200 {
+  color: #0F172A !important;
+}
+
+/* Secondary and muted text */
+html.light .text-slate-300,
+html.light .text-slate-400 {
+  color: #475569 !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748B !important;
+}
+
+/* Overlay & modal backdrop */
+html.light .bg-black\/80,
+html.light .bg-black\/70 {
+  background-color: rgba(15, 23, 42, 0.55) !important;
+}
+
+html.light .bg-black\/40,
+html.light .bg-black\/30,
+html.light .bg-black\/20 {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Light mode Auth form styling */
+html.light .dw-auth {
+  background: #F8FAFC;
+}
+
+html.light .dw-auth__card {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+html.light .dw-input {
+  background-color: #FFFFFF;
+  border-color: #CBD5E1;
+  color: #0F172A;
+}
+
+html.light .dw-input:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+html.light .dw-auth-tabs {
+  background: #F1F5F9;
+  border-color: #E2E8F0;
+}
+
+html.light .dw-auth-tab--active {
+  background: #FFFFFF;
+  color: #059669;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Extra container overrides */
+html.light .bg-\[\#0C101A\],
+html.light .bg-\[\#090D16\],
+html.light .bg-\[\#0C1518\],
+html.light .bg-\[\#0E1422\],
+html.light .bg-\[\#101524\],
+html.light .bg-\[\#101726\],
+html.light .bg-\[\#13111C\],
+html.light .bg-\[\#141824\] {
+  background-color: #FFFFFF !important;
+}
+
+/* Extra card & surface containers */
+html.light .bg-\[\#161F32\],
+html.light .bg-\[\#1E2740\] {
+  background-color: #FFFFFF !important;
+}
+
+/* Light mode form inputs */
+html.light input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html.light select,
+html.light textarea {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+
+/* Badges & slate pills */
+html.light .bg-slate-800 {
+  background-color: #E2E8F0 !important;
+  color: #334155 !important;
+}
+
+html.light .bg-slate-900 {
+  background-color: #F1F5F9 !important;
+  color: #1E293B !important;
+}

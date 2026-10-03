@@ -1,4 +1,4 @@
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from './api/client';
@@ -17,6 +17,7 @@ import { RefreshCw, CheckCircle2, AlertCircle, Sparkles, GitBranch, ArrowLeft } 
 export default function App() {
   const { isAuthenticated, logout: authLogout, user: authUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [workspaces, setWorkspaces] = useState([]);
   const [currentWorkspace, setCurrentWorkspace] = useState(null); // Defaults to null -> shows WorkspaceHub!
@@ -60,6 +61,49 @@ export default function App() {
     init();
   }, []);
 
+  // Parse deep URL parameters for native browser Back/Forward & direct opening
+  const pathname = location.pathname;
+  const pathParts = pathname.split('/').filter(Boolean);
+  const isWsPath = pathParts[0] === 'workspaces';
+  const urlWsId = isWsPath ? pathParts[1] : null;
+  const urlTab = isWsPath ? (pathParts[2] || 'diff') : 'diff';
+  const urlProposalId = (isWsPath && pathParts[2] === 'prs') ? pathParts[3] : null;
+
+  // Synchronize state whenever URL or workspaces change
+  useEffect(() => {
+    if (urlWsId) {
+      const match = workspaces.find((w) => w.id === urlWsId);
+      if (match) {
+        if (!currentWorkspace || currentWorkspace.id !== match.id) {
+          setCurrentWorkspace(match);
+        }
+      } else {
+        // Fallback placeholder while workspaces load or if direct deep link
+        if (!currentWorkspace || currentWorkspace.id !== urlWsId) {
+          setCurrentWorkspace({ id: urlWsId, name: urlWsId, d_count: 0, k_count: 0 });
+        }
+      }
+
+      if (urlTab && activeTab !== urlTab) {
+        setActiveTab(urlTab);
+      }
+    } else if (pathname === '/' || pathname === '/workspaces' || pathname === '/profile' || pathname === '/settings') {
+      if (currentWorkspace !== null) {
+        setCurrentWorkspace(null);
+      }
+    }
+  }, [pathname, urlWsId, urlTab, workspaces]);
+
+  // Update currentWorkspace reference if workspaces list gets fresh counts
+  useEffect(() => {
+    if (currentWorkspace?.id && workspaces.length > 0) {
+      const fresh = workspaces.find((w) => w.id === currentWorkspace.id);
+      if (fresh && (fresh.name !== currentWorkspace.name || fresh.d_count !== currentWorkspace.d_count || fresh.k_count !== currentWorkspace.k_count)) {
+        setCurrentWorkspace((prev) => prev ? { ...prev, ...fresh } : fresh);
+      }
+    }
+  }, [workspaces]);
+
   // Fetch workspace details based on active tab
   const refreshData = useCallback(async () => {
     if (!currentWorkspace?.id) return;
@@ -101,7 +145,6 @@ export default function App() {
         const statusRes = await api.getWorkspaceStatus(wsId);
         if (statusRes?.stats) {
           setStats(statusRes.stats);
-          // Also update counts in current workspace object
           if (statusRes.stats.total_documents !== undefined || statusRes.stats.knowledge_items !== undefined) {
             setCurrentWorkspace((prev) => {
               if (!prev) return prev;
@@ -152,20 +195,28 @@ export default function App() {
       };
       setWorkspaces((prev) => [wsItem, ...prev]);
       setCurrentWorkspace(wsItem);
-      setActiveTab('quickstart'); // Automatically shows GitHub-style CLI instructions!
       showToast(`Workspace "${name}" created! Follow CLI instructions to populate.`);
+      navigate(`/workspaces/${wsItem.id}/quickstart`);
     } catch (err) {
       showToast(`Create failed: ${err.message}`, 'error');
     }
   };
 
   const handleSelectWorkspace = (ws) => {
+    if (!ws) {
+      setCurrentWorkspace(null);
+      navigate('/');
+      return;
+    }
     setCurrentWorkspace(ws);
-    // If workspace is brand new / has 0 docs and 0 facts, show quickstart CLI guide by default
-    if ((ws.d_count === 0 && ws.k_count === 0) || ws.is_new) {
-      setActiveTab('quickstart');
-    } else {
-      setActiveTab('diff');
+    const targetTab = ((ws.d_count === 0 && ws.k_count === 0) || ws.is_new) ? 'quickstart' : 'diff';
+    navigate(`/workspaces/${ws.id}/${targetTab}`);
+  };
+
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    if (currentWorkspace?.id) {
+      navigate(`/workspaces/${currentWorkspace.id}/${tabId}`);
     }
   };
 
@@ -240,29 +291,21 @@ export default function App() {
     navigate('/login', { replace: true });
   };
 
-  // If user is not authenticated, strictly redirect to /login
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // Check if current workspace is completely empty
+  // Determine if workspace is completely empty (0 docs and 0 facts, and user hasn't explicitly dismissed the quickstart)
   const isWorkspaceEmpty = currentWorkspace && 
     (currentWorkspace.d_count === 0 && currentWorkspace.k_count === 0) &&
     dismissedEmptyStateFor !== currentWorkspace.id;
 
   return (
-    <div className="min-h-screen bg-[#0D1117] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/20 selection:text-emerald-300">
-      {/* Platform Navigation */}
+    <div className="min-h-screen bg-[#080B11] text-slate-100 flex flex-col font-sans transition-colors duration-200">
+      {/* Three-tier GitHub/Vercel style Navbar */}
       <Navbar
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
         workspaces={workspaces}
         currentWorkspace={currentWorkspace}
         onSelectWorkspace={handleSelectWorkspace}
-        onOpenHub={() => setCurrentWorkspace(null)}
         onCreateWorkspace={handleCreateWorkspace}
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={handleTabChange}
         stats={stats}
         currentUser={currentUser}
         onLogout={handleLogout}
@@ -293,13 +336,14 @@ export default function App() {
             {/* Workspace Context Bar */}
             <div className="flex items-center justify-between text-xs text-slate-400">
               <div className="flex items-center space-x-2">
-                <button
+                <Link
+                  to="/"
                   onClick={() => setCurrentWorkspace(null)}
                   className="hover:text-emerald-400 transition flex items-center space-x-1 font-semibold"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Workspaces</span>
-                </button>
+                </Link>
                 <span className="text-slate-600">/</span>
                 <span className="font-semibold text-white flex items-center space-x-1">
                   <GitBranch className="w-3.5 h-3.5 text-emerald-400" />
@@ -308,19 +352,20 @@ export default function App() {
                 <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20 font-bold">
                   main
                 </span>
-                <span className="text-slate-600">·</span>
+                <span className="text-slate-600">&bull;</span>
                 <span className="text-slate-400 font-mono text-[11px] truncate max-w-[200px] sm:max-w-none">
                   Workspace: {currentWorkspace.id}
                 </span>
               </div>
 
               <div className="flex items-center space-x-2">
-                <button
+                <Link
+                  to={`/workspaces/${currentWorkspace.id}/staging`}
                   onClick={() => setActiveTab('staging')}
-                  className="px-2.5 py-1 rounded-md bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition"
+                  className="px-2.5 py-1 rounded-md bg-[#238636] hover:bg-[#2EA043] text-white font-semibold text-xs transition block no-underline"
                 >
                   + Stage Document
-                </button>
+                </Link>
                 <button
                   onClick={() => refreshData()}
                   className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white transition"
@@ -340,7 +385,7 @@ export default function App() {
                 onRefresh={refreshData}
                 onDismissEmptyState={() => {
                   setDismissedEmptyStateFor(currentWorkspace.id);
-                  setActiveTab('diff');
+                  handleTabChange('diff');
                 }}
               />
             ) : (
@@ -362,6 +407,8 @@ export default function App() {
                     onReviewProposal={handleReview}
                     onBatchReview={handleBatchReview}
                     loading={loading}
+                    workspaceId={currentWorkspace.id}
+                    selectedProposalId={urlProposalId}
                   />
                 )}
 
