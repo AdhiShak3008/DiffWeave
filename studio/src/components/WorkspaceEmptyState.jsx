@@ -375,11 +375,10 @@ export default function WorkspaceEmptyState({
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setActiveTab('workflow')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
-                  activeTab === 'workflow'
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${activeTab === 'workflow'
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                     : 'text-slate-400 hover:text-white hover:bg-[#21262D]'
-                }`}
+                  }`}
               >
                 <CheckSquare className="w-3.5 h-3.5" />
                 <span>Quickstart Workflow (7 Steps)</span>
@@ -387,20 +386,17 @@ export default function WorkspaceEmptyState({
 
               <button
                 onClick={() => setActiveTab('all_commands')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
-                  activeTab === 'all_commands'
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${activeTab === 'all_commands'
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                     : 'text-slate-400 hover:text-white hover:bg-[#21262D]'
-                }`}
+                  }`}
               >
                 <Terminal className="w-3.5 h-3.5" />
                 <span>All CLI Commands ({allCommands.length})</span>
               </button>
             </div>
 
-            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
-              Every command is individually copyable
-            </span>
+
           </div>
 
           {/* VIEW 1: Onboarding 7-Step Workflow */}
@@ -436,11 +432,10 @@ export default function WorkspaceEmptyState({
                         {/* Dedicated Individual Copy Button */}
                         <button
                           onClick={() => copyToClipboard(step.command, step.id)}
-                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 ${
-                            isCopied
+                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 ${isCopied
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                               : 'bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white'
-                          }`}
+                            }`}
                           title="Copy command to clipboard"
                         >
                           {isCopied ? (
@@ -493,11 +488,10 @@ export default function WorkspaceEmptyState({
                       <button
                         key={cat.id}
                         onClick={() => setCommandCategory(cat.id)}
-                        className={`px-2.5 py-1 rounded-md transition font-medium ${
-                          commandCategory === cat.id
+                        className={`px-2.5 py-1 rounded-md transition font-medium ${commandCategory === cat.id
                             ? 'bg-[#21262D] text-white border border-[#30363D]'
                             : 'text-slate-400 hover:text-white'
-                        }`}
+                          }`}
                       >
                         {cat.label}
                       </button>
@@ -544,11 +538,10 @@ export default function WorkspaceEmptyState({
                         {/* Dedicated Individual Copy Button */}
                         <button
                           onClick={() => copyToClipboard(cmd.command, `all_${idx}`)}
-                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 ${
-                            isCopied
+                          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 ${isCopied
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                               : 'bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white'
-                          }`}
+                            }`}
                           title="Copy command to clipboard"
                         >
                           {isCopied ? (
