@@ -82,31 +82,65 @@ export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatch
         </div>
 
         <div className="flex items-center space-x-2 text-xs">
-          {['PENDING', 'APPROVED', 'REJECTED', 'ALL'].map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`px-3 py-1.5 rounded-lg font-medium transition ${
-                filterStatus === status
-                  ? 'bg-slate-700 text-white font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
-              }`}
-            >
-              {status}
-            </button>
-          ))}
+          {['PENDING', 'APPROVED', 'REJECTED', 'ALL'].map((status) => {
+            const count = status === 'ALL'
+              ? proposals.length
+              : proposals.filter((p) => p.status === status).length;
+            return (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5 ${
+                  filterStatus === status
+                    ? 'bg-slate-700 text-white font-semibold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`}
+              >
+                <span>{status}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  filterStatus === status ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {filteredProposals.length === 0 ? (
-        <div className="bg-[#0C101A] border border-slate-800/80 rounded-2xl p-16 text-center shadow-inner">
-          <div className="w-12 h-12 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-4">
+        <div className="bg-[#0C101A] border border-slate-800/80 rounded-2xl p-12 text-center shadow-inner space-y-4">
+          <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-semibold text-white mb-1">All PRs Reviewed</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            There are currently no proposals matching filter <strong className="text-slate-300">{filterStatus}</strong>.
-          </p>
+          <div>
+            <h3 className="text-base font-semibold text-white mb-1">Clean Review Queue</h3>
+            {filterStatus === 'PENDING' && proposals.some((p) => p.status === 'APPROVED') ? (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  All extracted document knowledge proposals were <span className="text-emerald-400 font-semibold">auto-approved</span> and committed directly into the Master Knowledge Register based on confidence and policy rules.
+                </p>
+                <div className="flex items-center justify-center space-x-3 pt-2">
+                  <button
+                    onClick={() => setFilterStatus('APPROVED')}
+                    className="px-4 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold transition"
+                  >
+                    View Approved Proposals ({proposals.filter((p) => p.status === 'APPROVED').length})
+                  </button>
+                  <Link
+                    to={`/workspaces/${workspaceId}/knowledge`}
+                    className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium transition"
+                  >
+                    Open Knowledge Register
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                There are currently no proposals matching filter <strong className="text-slate-300">{filterStatus}</strong>.
+              </p>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

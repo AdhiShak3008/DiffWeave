@@ -173,6 +173,29 @@ export default function App() {
     refreshData();
   }, [refreshData]);
 
+  // Live auto-polling: Polls active workspace data every 5 seconds so CLI actions
+  // (dw add, dw commit, dw push) reflect instantly without manual browser refresh
+  useEffect(() => {
+    if (!currentWorkspace?.id) return;
+    const interval = setInterval(() => {
+      refreshData();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [currentWorkspace?.id, refreshData]);
+
+  // Live auto-polling on WorkspaceHub: Polls workspaces list every 8 seconds
+  // so document/fact counters update in real time as CLI commands run
+  useEffect(() => {
+    if (currentWorkspace?.id) return;
+    const interval = setInterval(async () => {
+      try {
+        const wsList = await api.getWorkspaces();
+        if (Array.isArray(wsList)) setWorkspaces(wsList);
+      } catch {}
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [currentWorkspace?.id]);
+
   useEffect(() => {
     if (authUser) {
       setCurrentUser(authUser);

@@ -63,22 +63,25 @@ def get_active_workspace(
     """
     Resolve the active workspace ID:
     1. CLI flag override (--workspace)
-    2. Environment variable DOCWEAVE_WORKSPACE_ID / DIFFWEAVE_WORKSPACE_ID
-    3. Local .diffweave/config.json
+    2. Local directory .diffweave/config.json (like .git, takes precedence over ambient env)
+    3. Environment variable DIFFWEAVE_WORKSPACE_ID / DOCWEAVE_WORKSPACE_ID
     """
+    # 1. Direct CLI flag override
     if override_id and override_id.strip():
         return override_id.strip()
 
-    env_ws = os.environ.get("DIFFWEAVE_WORKSPACE_ID") or os.environ.get("DOCWEAVE_WORKSPACE_ID")
-    if env_ws and env_ws.strip():
-        return env_ws.strip()
-
+    # 2. Local initialized workspace context (.diffweave/config.json)
     config = load_config(start_dir)
     ws_id = config.get("workspace_id")
     if ws_id and str(ws_id).strip():
         return str(ws_id).strip()
 
+    # 3. Ambient environment variable override
+    env_ws = os.environ.get("DIFFWEAVE_WORKSPACE_ID") or os.environ.get("DOCWEAVE_WORKSPACE_ID")
+    if env_ws and env_ws.strip():
+        return env_ws.strip()
+
     raise WorkspaceNotConfiguredError(
         "No active workspace found. Run 'dw init' to bind this directory to a workspace, "
-        "or pass '--workspace <uuid>'."
+        "or pass '--workspace <name_or_uuid>'."
     )

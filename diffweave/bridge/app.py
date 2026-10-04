@@ -429,11 +429,13 @@ async def retry_document_endpoint(document_id: str):
 async def get_proposals(
     workspace_id: str,
     document_version_id: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
 ):
     try:
-        props = await client.list_pending_proposals(workspace_id, document_version_id)
-        if not props:
-            props = db_store.get_db_proposals(workspace_id)
+        filter_status = None if (not status or status.upper() == "ALL") else status.upper()
+        props = db_store.get_db_proposals(workspace_id, status=filter_status)
+        if not props and status and status.upper() == "PENDING":
+            props = await client.list_pending_proposals(workspace_id, document_version_id)
         return props
     except Exception:
         return db_store.get_db_proposals(workspace_id)
