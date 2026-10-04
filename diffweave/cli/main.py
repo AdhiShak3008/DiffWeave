@@ -24,6 +24,7 @@ from diffweave.cli.commands.diff_cmd import diff_command
 from diffweave.cli.commands.validate_cmd import validate_command
 from diffweave.cli.commands.review_cmd import review_command
 from diffweave.cli.commands.commit_cmd import commit_command
+from diffweave.cli.commands.push_cmd import push_command
 from diffweave.cli.commands.log_cmd import log_command
 from diffweave.cli.commands.search_cmd import search_command
 from diffweave.cli.commands.doctor_cmd import doctor_command
@@ -51,6 +52,7 @@ app.command(name="diff", help="Semantic fact diff comparing proposals against co
 app.command(name="validate", help="Run policy validation lint checks on proposals")(validate_command)
 app.command(name="review", help="Interactive review wizard for pending proposals (approve/reject/archive)")(review_command)
 app.command(name="commit", help="Commit approved knowledge to the Master Knowledge Register")(commit_command)
+app.command(name="push", help="Push and publish staged document proposals to Master Knowledge Truth")(push_command)
 app.command(name="log", help="Display chronological knowledge audit trail and timeline")(log_command)
 app.command(name="search", help="Search committed knowledge using hybrid lexical + vector search")(search_command)
 app.command(name="doctor", help="Run diagnostic health checks on MCP and workspace")(doctor_command)

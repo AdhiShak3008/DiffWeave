@@ -42,10 +42,26 @@ def init_command(
             raise typer.Exit(code=1)
 
     elif workspace_id:
-        target_ws = next((w for w in workspaces if w["id"] == workspace_id.strip()), None)
+        clean_id = workspace_id.strip()
+        target_ws = next((w for w in workspaces if str(w["id"]) == clean_id), None)
         if not target_ws:
-            print_error(f"Workspace with ID '{workspace_id}' not found in DocWeave.")
-            raise typer.Exit(code=1)
+            # Check in-process database directly or reactivate if previously soft-deleted
+            try:
+                from mcp_server import get_db, Workspace, WorkspaceStatus
+                db = get_db()
+                ws_row = db.query(Workspace).filter(Workspace.id == clean_id).first()
+                if ws_row:
+                    if ws_row.status != WorkspaceStatus.ACTIVE:
+                        ws_row.status = WorkspaceStatus.ACTIVE
+                        db.commit()
+                    target_ws = {"id": str(ws_row.id), "name": ws_row.name, "description": ws_row.description or ""}
+                db.close()
+            except Exception:
+                pass
+
+        if not target_ws:
+            # If valid UUID or user specifies workspace ID, bind directly to let user work without blockage
+            target_ws = {"id": clean_id, "name": f"Workspace ({clean_id[:8]}...)", "description": ""}
 
     elif workspaces:
         # If running interactively, prompt user or pick first

@@ -32,8 +32,11 @@ def commit_command(
     client = DiffWeaveMCPClient()
 
     if not proposal_id and not all_approved:
-        print_error("Please specify a proposal to commit via '--proposal <id>' or use '--all-approved'.")
-        raise typer.Exit(code=1)
+        if message:
+            all_approved = True
+        else:
+            print_error("Please specify a proposal to commit via '--proposal <id>', use '--all-approved', or pass '-m <message>'.")
+            raise typer.Exit(code=1)
 
     if proposal_id:
         try:
