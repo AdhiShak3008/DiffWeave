@@ -6,7 +6,7 @@ import {
   UploadCloud,
   FileText,
   GitBranch,
-  ShieldAlert,
+  ShieldCheck,
   ArrowRight,
   BookOpen,
   Sparkles,
@@ -14,7 +14,9 @@ import {
   Code2,
   CheckCircle2,
   Globe,
-  Laptop
+  Layers,
+  Cpu,
+  Info
 } from 'lucide-react';
 
 export default function WorkspaceEmptyState({
@@ -27,12 +29,9 @@ export default function WorkspaceEmptyState({
   const [copiedId, setCopiedId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [shellTab, setShellTab] = useState('cmd'); // 'cmd' | 'bash'
 
-  const wsId = workspace?.id || 'workspace-id';
-  const token = typeof window !== 'undefined'
-    ? (localStorage.getItem('diffweave_token') || localStorage.getItem('token') || '')
-    : '';
+  // Human-readable workspace name (unique identifier)
+  const wsName = workspace?.name || 'my-workspace';
 
   const copyToClipboard = (text, id) => {
     navigator.clipboard.writeText(text);
@@ -58,26 +57,64 @@ export default function WorkspaceEmptyState({
     }
   };
 
-  // Commands without comments for direct pasting into terminal
-  const cmdAll = `pip install git+https://github.com/AdhiShak3008/DiffWeave.git
-dw login --token ${token || 'YOUR_API_TOKEN'}
-mkdir my-docs
-cd my-docs
-dw init --workspace ${wsId}
-dw add sample.pdf
-dw diff
-dw push`;
-
-  const bashAll = `pip install git+https://github.com/AdhiShak3008/DiffWeave.git
-dw login --token ${token || 'YOUR_API_TOKEN'}
-mkdir -p my-docs && cd my-docs
-dw init --workspace ${wsId}
-dw add sample.pdf
-dw diff
-dw push`;
-
-  const loginCmd = `dw login --token ${token || 'YOUR_API_TOKEN'}`;
-  const initCmd = `dw init --workspace ${wsId}`;
+  const steps = [
+    {
+      id: 'step_install',
+      stepNum: '1',
+      title: 'Install DiffWeave CLI',
+      desc: 'Installs the dw command-line utility globally on your workstation via pip. Compatible across Windows, macOS, Linux, and automated CI/CD runners.',
+      command: 'pip install git+https://github.com/AdhiShak3008/DiffWeave.git',
+      details: 'Registers the dw binary in your system PATH with full support for semantic diffs, staging, and policy rules.'
+    },
+    {
+      id: 'step_auth',
+      stepNum: '2',
+      title: 'Authenticate CLI Session',
+      desc: 'Stores an authenticated session in ~/.diffweave/credentials.json. You can copy your personal API token anytime from the visible "Copy API Key" button in the Studio header.',
+      command: 'dw login --token <YOUR_DIFFWEAVE_API_KEY>',
+      details: 'Alternatively, sign in with your email and password via: dw login --email developer@example.com'
+    },
+    {
+      id: 'step_dir',
+      stepNum: '3',
+      title: 'Create & Enter Local Document Directory',
+      desc: 'Create a local folder on your filesystem to organize the specifications, policy files, or markdown documentation you want to track.',
+      command: 'mkdir my-docs && cd my-docs',
+      details: 'Navigating into a dedicated directory ensures DiffWeave tracks only the intended documentation files.'
+    },
+    {
+      id: 'step_init',
+      stepNum: '4',
+      title: 'Initialize Workspace by Name',
+      desc: `Binds your current directory to the "${wsName}" workspace by its unique name. No database UUIDs required.`,
+      command: `dw init --workspace "${wsName}"`,
+      details: 'Generates a local .diffweave/ configuration file binding this repository to the remote cloud workspace.'
+    },
+    {
+      id: 'step_stage',
+      stepNum: '5',
+      title: 'Stage Documents for Parsing & Extraction',
+      desc: 'Ingests your local documents into the deterministic parsing engine to extract verifiable facts, claims, and semantic relationships.',
+      command: 'dw add ./sample_policy.txt',
+      details: 'Supports PDF, DOCX, Markdown, and TXT files. The extraction pipeline automatically isolates facts and creates knowledge proposals.'
+    },
+    {
+      id: 'step_diff',
+      stepNum: '6',
+      title: 'Inspect Semantic Fact Diff',
+      desc: 'Computes a semantic delta comparing extracted claims against the Master Knowledge Register to detect additions, conflicts, and policy violations.',
+      command: 'dw diff',
+      details: 'Displays high-confidence facts, confidence scores, and potential contradictions with your current committed baseline.'
+    },
+    {
+      id: 'step_push',
+      stepNum: '7',
+      title: 'Push Verified Knowledge to Cloud',
+      desc: 'Commits approved knowledge proposals to the cloud Master Truth register, updating your Knowledge Graph and Studio in real time.',
+      command: 'dw push',
+      details: 'Synchronizes your local review state with the remote register, creating an immutable audit trail entry.'
+    }
+  ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 py-4">
@@ -87,206 +124,113 @@ dw push`;
           <div>
             <div className="flex items-center space-x-2">
               <Terminal className="w-5 h-5 text-emerald-400" />
-              <h3 className="text-base font-bold text-white">Quick setup &mdash; CLI Document Ingestion</h3>
+              <h3 className="text-base font-bold text-white">CLI Quickstart &mdash; Workspace Ingestion</h3>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Follow these commands to push documents into <strong className="text-slate-200">{workspace?.name || 'this workspace'}</strong> or stage directly in the browser below.
+              Initialize this workspace in your local terminal using the steps below, or drag and drop files directly in the browser.
             </p>
           </div>
           <div className="flex items-center space-x-2 text-xs font-mono">
             <span className="px-2.5 py-1 rounded bg-[#161B22] border border-[#30363D] text-slate-300">
-              Workspace ID: <span className="text-emerald-400 font-bold">{wsId.slice(0, 8)}...</span>
+              Workspace: <span className="text-emerald-400 font-bold">{wsName}</span>
             </span>
             <button
-              onClick={() => copyToClipboard(wsId, 'wsid')}
+              onClick={() => copyToClipboard(`dw init --workspace "${wsName}"`, 'init_badge')}
               className="p-1.5 rounded bg-[#21262D] hover:bg-[#30363D] text-slate-300 transition"
-              title="Copy full workspace ID"
+              title="Copy dw init command for this workspace"
             >
-              {copiedId === 'wsid' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedId === 'init_badge' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           </div>
         </div>
 
-        {/* Universal Cross-Platform Notice */}
-        <div className="mx-6 mt-6 rounded-xl bg-gradient-to-r from-emerald-950/40 via-[#0D1117] to-sky-950/30 border border-emerald-500/20 p-4">
+        {/* Professional Enterprise Client Notice */}
+        <div className="mx-6 mt-6 rounded-xl bg-gradient-to-r from-emerald-950/30 via-[#0D1117] to-sky-950/20 border border-emerald-500/20 p-4">
           <div className="flex items-start space-x-3.5">
             <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
               <Globe className="w-5 h-5" />
             </div>
             <div className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="text-xs font-bold text-white">Universal CLI & Multi-Platform Support</h4>
+                <h4 className="text-xs font-bold text-white">Cross-Platform Terminal Client</h4>
                 <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">
-                  Cloud Synchronized
+                  CLI &bull; MCP &bull; Studio
                 </span>
               </div>
               <p className="text-xs text-slate-300 leading-relaxed">
-                These CLI commands operate across <strong>Windows, macOS, and Linux</strong>. Documents pushed through the CLI immediately reconcile against your cloud Knowledge Register.
+                Install and run the DiffWeave CLI across any developer workstation, local environment, or CI/CD runner to stage documentation, inspect semantic diffs, and synchronize verified knowledge with the cloud register.
               </p>
             </div>
           </div>
         </div>
 
         <div className="p-6 space-y-6">
-          {/* CLI Instructions with Shell Selector */}
+          {/* Step-by-Step Command Workflow */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h4 className="text-sm font-bold text-white flex items-center space-x-2">
-                <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-xs flex items-center justify-center font-bold">1</span>
-                <span>Run in your local terminal</span>
-              </h4>
+            <h4 className="text-sm font-bold text-white flex items-center space-x-2">
+              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-xs flex items-center justify-center font-bold">1</span>
+              <span>Command-Line Workflow Guide</span>
+            </h4>
 
-              {/* Shell switcher & Copy All button */}
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center bg-[#0D1117] border border-[#30363D] rounded-lg p-0.5 text-xs font-mono">
-                  <button
-                    onClick={() => setShellTab('cmd')}
-                    className={`px-2.5 py-1 rounded transition ${
-                      shellTab === 'cmd'
-                        ? 'bg-[#21262D] text-emerald-400 font-bold shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
+            {/* Individual Command Cards */}
+            <div className="space-y-3">
+              {steps.map((step) => {
+                const isCopied = copiedId === step.id;
+                return (
+                  <div
+                    key={step.id}
+                    className="rounded-xl bg-[#0D1117] border border-[#30363D] hover:border-slate-600 transition p-4 space-y-2.5"
                   >
-                    Windows CMD
-                  </button>
-                  <button
-                    onClick={() => setShellTab('bash')}
-                    className={`px-2.5 py-1 rounded transition ${
-                      shellTab === 'bash'
-                        ? 'bg-[#21262D] text-emerald-400 font-bold shadow-sm'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    PowerShell / Bash
-                  </button>
-                </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#161B22] border border-[#30363D] text-emerald-400">
+                            Step {step.stepNum}
+                          </span>
+                          <h5 className="text-xs font-bold text-white">{step.title}</h5>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                          {step.desc}
+                        </p>
+                      </div>
 
-                <button
-                  onClick={() => copyToClipboard(shellTab === 'cmd' ? cmdAll : bashAll, 'cli_all')}
-                  className="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-xs text-slate-300 hover:text-white transition font-medium"
-                  title="Copy all commands sequentially"
-                >
-                  {copiedId === 'cli_all' ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400 font-semibold">All Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy All</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
+                      {/* Dedicated Individual Copy Button */}
+                      <button
+                        onClick={() => copyToClipboard(step.command, step.id)}
+                        className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition shrink-0 ${
+                          isCopied
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                            : 'bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white'
+                        }`}
+                        title="Copy command to clipboard"
+                      >
+                        {isCopied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Copy Command</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
 
-            {/* Step-by-step Interactive Command Blocks */}
-            <div className="space-y-2.5 font-mono text-xs">
-              {/* Step 1: Install */}
-              <div className="group rounded-lg bg-[#0D1117] border border-[#30363D] p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] text-slate-500 block mb-0.5"># Step 1: Install CLI package globally</span>
-                  <code><span className="text-emerald-400 font-bold">pip</span> install git+https://github.com/AdhiShak3008/DiffWeave.git</code>
-                </div>
-                <button
-                  onClick={() => copyToClipboard('pip install git+https://github.com/AdhiShak3008/DiffWeave.git', 'c1')}
-                  className="opacity-70 group-hover:opacity-100 p-1.5 rounded bg-[#161B22] hover:bg-[#21262D] text-slate-300 transition"
-                  title="Copy command"
-                >
-                  {copiedId === 'c1' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+                    {/* Code Snippet Box */}
+                    <div className="rounded-lg bg-[#010409] border border-[#21262D] px-3.5 py-2.5 font-mono text-xs text-slate-200 overflow-x-auto select-all">
+                      <code>{step.command}</code>
+                    </div>
 
-              {/* Step 2: Login */}
-              <div className="group rounded-lg bg-[#0D1117] border border-[#30363D] p-3 flex items-center justify-between">
-                <div className="truncate mr-2">
-                  <span className="text-[11px] text-slate-500 block mb-0.5"># Step 2: Authenticate session with API token</span>
-                  <code className="truncate block"><span className="text-emerald-400 font-bold">dw</span> login --token <span className="text-amber-300 font-mono">{token ? token.slice(0, 24) + '...' : 'YOUR_TOKEN'}</span></code>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(loginCmd, 'c2')}
-                  className="opacity-70 group-hover:opacity-100 p-1.5 rounded bg-[#161B22] hover:bg-[#21262D] text-slate-300 transition shrink-0"
-                  title="Copy full token login command"
-                >
-                  {copiedId === 'c2' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              {/* Step 3: Create & Navigate Directory */}
-              <div className="group rounded-lg bg-[#0D1117] border border-[#30363D] p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] text-slate-500 block mb-0.5"># Step 3: Create a document directory and enter it</span>
-                  <code>{shellTab === 'cmd' ? 'mkdir my-docs && cd my-docs' : 'mkdir -p my-docs && cd my-docs'}</code>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(shellTab === 'cmd' ? 'mkdir my-docs && cd my-docs' : 'mkdir -p my-docs && cd my-docs', 'c3')}
-                  className="opacity-70 group-hover:opacity-100 p-1.5 rounded bg-[#161B22] hover:bg-[#21262D] text-slate-300 transition"
-                  title="Copy command"
-                >
-                  {copiedId === 'c3' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              {/* Step 4: Init Workspace */}
-              <div className="group rounded-lg bg-[#0D1117] border border-[#30363D] p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] text-slate-500 block mb-0.5"># Step 4: Bind local folder to this workspace</span>
-                  <code><span className="text-emerald-400 font-bold">dw</span> init --workspace <span className="text-sky-300 font-bold">{wsId}</span></code>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(initCmd, 'c4')}
-                  className="opacity-70 group-hover:opacity-100 p-1.5 rounded bg-[#161B22] hover:bg-[#21262D] text-slate-300 transition"
-                  title="Copy command"
-                >
-                  {copiedId === 'c4' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              {/* Step 5: Add document */}
-              <div className="group rounded-lg bg-[#0D1117] border border-[#30363D] p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] text-slate-500 block mb-0.5"># Step 5: Stage documents for parsing &amp; fact extraction</span>
-                  <code><span className="text-emerald-400 font-bold">dw</span> add <span className="text-teal-300">./your-document.pdf</span></code>
-                </div>
-                <button
-                  onClick={() => copyToClipboard('dw add ./your-document.pdf', 'c5')}
-                  className="opacity-70 group-hover:opacity-100 p-1.5 rounded bg-[#161B22] hover:bg-[#21262D] text-slate-300 transition"
-                  title="Copy command"
-                >
-                  {copiedId === 'c5' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              {/* Step 6: Diff */}
-              <div className="group rounded-lg bg-[#0D1117] border border-[#30363D] p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] text-slate-500 block mb-0.5"># Step 6: Inspect semantic fact diff against Master Truth</span>
-                  <code><span className="text-emerald-400 font-bold">dw</span> diff</code>
-                </div>
-                <button
-                  onClick={() => copyToClipboard('dw diff', 'c6')}
-                  className="opacity-70 group-hover:opacity-100 p-1.5 rounded bg-[#161B22] hover:bg-[#21262D] text-slate-300 transition"
-                  title="Copy command"
-                >
-                  {copiedId === 'c6' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              {/* Step 7: Push */}
-              <div className="group rounded-lg bg-[#0D1117] border border-[#30363D] p-3 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] text-slate-500 block mb-0.5"># Step 7: Commit &amp; push verified knowledge to cloud</span>
-                  <code><span className="text-emerald-400 font-bold">dw</span> push</code>
-                </div>
-                <button
-                  onClick={() => copyToClipboard('dw push', 'c7')}
-                  className="opacity-70 group-hover:opacity-100 p-1.5 rounded bg-[#161B22] hover:bg-[#21262D] text-slate-300 transition"
-                  title="Copy command"
-                >
-                  {copiedId === 'c7' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+                    {/* Deep Feature Details */}
+                    <div className="flex items-center space-x-1.5 text-[11px] text-slate-500 font-sans">
+                      <Info className="w-3 h-3 text-sky-400 shrink-0" />
+                      <span>{step.details}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -331,13 +275,14 @@ dw push`;
 
         {/* Footer Dismiss / Continue Bar */}
         <div className="bg-[#21262D]/40 border-t border-[#30363D] px-6 py-3 flex items-center justify-between text-xs text-slate-400">
-          <span>Need help? Check out our developer guide or run <code className="text-emerald-400 font-mono">dw doctor</code></span>
+          <span>Need diagnostic information? Run <code className="text-emerald-400 font-mono">dw doctor</code> in your terminal</span>
           {onDismissEmptyState && (
             <button
               onClick={onDismissEmptyState}
-              className="text-emerald-400 hover:text-emerald-300 font-semibold transition"
+              className="text-emerald-400 hover:text-emerald-300 font-semibold transition flex items-center space-x-1"
             >
-              Continue to Workspace Dashboard &rarr;
+              <span>Continue to Workspace Dashboard</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

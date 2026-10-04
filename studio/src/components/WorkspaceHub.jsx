@@ -89,9 +89,9 @@ export default function WorkspaceHub({
     return suggestions[Math.floor(Math.random() * suggestions.length)];
   });
 
-  const username = currentUser?.username || 'Adhi Shakthi hash';
-  const displayName = currentUser?.username || 'Adhi Shakthi hash';
-  const email = currentUser?.email || 'adhibshakthi@gmail.com';
+  const username = currentUser?.username || 'developer';
+  const displayName = currentUser?.username || 'developer';
+  const email = currentUser?.email || 'developer@diffweave.io';
   const token = typeof window !== 'undefined' ? (localStorage.getItem('diffweave_token') || localStorage.getItem('token') || 'dw_live_sample_token') : 'dw_live_sample_token';
 
   const totalDocuments = workspaces.reduce((acc, w) => acc + (w.d_count ?? 0), 0);
