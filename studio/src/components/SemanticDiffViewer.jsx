@@ -25,6 +25,8 @@ export default function SemanticDiffViewer({ diffData, onReviewProposal, onBatch
   const [comments, setComments] = useState({});
   const [expandedComments, setExpandedComments] = useState({});
   const [actionLoading, setActionLoading] = useState({});
+  const [reviewedLocal, setReviewedLocal] = useState({});
+  const [lastActionToast, setLastActionToast] = useState(null);
 
   if (loading) {
     return (
@@ -35,17 +37,39 @@ export default function SemanticDiffViewer({ diffData, onReviewProposal, onBatch
     );
   }
 
-  const additions = diffData?.additions || [];
-  const changes = diffData?.changes || [];
-  const conflicts = diffData?.conflicts || [];
-  const removals = diffData?.removals || [];
+  const rawAdditions = diffData?.additions || [];
+  const rawChanges = diffData?.changes || [];
+  const rawConflicts = diffData?.conflicts || [];
+  const rawRemovals = diffData?.removals || [];
+
+  // Filter out any delta that was just approved or rejected in local state
+  const additions = rawAdditions.filter((a) => !reviewedLocal[a.proposal_id] && !reviewedLocal[a.id]);
+  const changes = rawChanges.filter((c) => !reviewedLocal[c.proposal_id] && !reviewedLocal[c.id]);
+  const conflicts = rawConflicts.filter((c) => !reviewedLocal[c.proposal_id] && !reviewedLocal[c.id]);
+  const removals = rawRemovals.filter((r) => !reviewedLocal[r.proposal_id] && !reviewedLocal[r.id]);
 
   const totalDeltas = additions.length + changes.length + conflicts.length + removals.length;
 
   const handleAction = async (proposalId, decision) => {
+    const allDeltas = [...rawConflicts, ...rawAdditions, ...rawChanges, ...rawRemovals];
+    const found = allDeltas.find((d) => (d.proposal_id === proposalId || d.id === proposalId));
+    const title = found?.title || found?.proposed_value || found?.summary || `Delta #${proposalId.slice(0, 8)}`;
+
+    // Instant local removal & feedback banner
+    setReviewedLocal((prev) => ({
+      ...prev,
+      [proposalId]: { decision, title, time: new Date().toLocaleTimeString() }
+    }));
+
+    setLastActionToast({
+      proposalId,
+      decision,
+      title,
+      time: new Date().toLocaleTimeString()
+    });
+
     setActionLoading((prev) => ({ ...prev, [proposalId]: true }));
     try {
-      await onReviewProposal(proposalId, decision, comments[proposalId] || '');
       if (decision === 'APPROVED') {
         confetti({
           particleCount: 50,
@@ -54,13 +78,28 @@ export default function SemanticDiffViewer({ diffData, onReviewProposal, onBatch
           colors: ['#10B981', '#14B8A6', '#3B82F6'],
         });
       }
+      await onReviewProposal(proposalId, decision, comments[proposalId] || '');
+    } catch (err) {
+      console.error('Error applying diff review:', err);
     } finally {
       setActionLoading((prev) => ({ ...prev, [proposalId]: false }));
     }
   };
 
   const handleBatch = async (decision) => {
-    await onBatchReview(decision);
+    const allIds = [...rawConflicts, ...rawAdditions, ...rawChanges, ...rawRemovals].map((d) => d.proposal_id || d.id);
+    const batchMap = {};
+    allIds.forEach((id) => {
+      batchMap[id] = { decision, title: 'Batch Knowledge Item' };
+    });
+    setReviewedLocal((prev) => ({ ...prev, ...batchMap }));
+
+    setLastActionToast({
+      decision,
+      title: `Batch of ${allIds.length} semantic fact deltas`,
+      time: new Date().toLocaleTimeString()
+    });
+
     if (decision === 'APPROVED') {
       confetti({
         particleCount: 90,
@@ -68,6 +107,7 @@ export default function SemanticDiffViewer({ diffData, onReviewProposal, onBatch
         origin: { y: 0.7 },
       });
     }
+    await onBatchReview(decision);
   };
 
   return (
@@ -162,6 +202,43 @@ export default function SemanticDiffViewer({ diffData, onReviewProposal, onBatch
           )}
         </div>
       </div>
+
+      {/* Reactive Recent Action Toast Banner */}
+      {lastActionToast && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between transition-all duration-300 shadow-md ${
+          lastActionToast.decision === 'APPROVED'
+            ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
+            : 'bg-rose-950/40 border-rose-500/50 text-rose-200'
+        }`}>
+          <div className="flex items-center space-x-3">
+            <span className={`p-2 rounded-lg ${lastActionToast.decision === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+              {lastActionToast.decision === 'APPROVED' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+            </span>
+            <div>
+              <div className="flex items-center space-x-2 text-xs font-bold">
+                <span>
+                  {lastActionToast.decision === 'APPROVED' ? '✓ Approved & Merged to Master Truth Register' : '✕ Rejected & Dismissed'}:
+                </span>
+                {lastActionToast.proposalId && (
+                  <span className="font-mono text-[11px] opacity-80">ID: {lastActionToast.proposalId.slice(0, 8)}</span>
+                )}
+                <span className="text-[10px] text-slate-400 font-normal">at {lastActionToast.time}</span>
+              </div>
+              <p className="text-xs text-slate-300 line-clamp-1 mt-0.5 font-sans">
+                "{lastActionToast.title}"
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setLastActionToast(null)}
+            className="text-slate-400 hover:text-white text-lg px-2"
+            title="Dismiss"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {totalDeltas === 0 ? (
         <div className="bg-[#0C101A] border border-slate-800/80 rounded-2xl p-16 text-center shadow-inner">

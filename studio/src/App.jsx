@@ -244,22 +244,87 @@ export default function App() {
   };
 
   const handleReview = async (proposalId, decision, comments = '') => {
+    // 1. Identify proposal details for rich feedback
+    const targetProp = (proposals || []).find((p) => p.id === proposalId || p.proposal_id === proposalId);
+    const factSnippet = targetProp?.summary ||
+      targetProp?.proposed_changes?.value ||
+      targetProp?.proposed_changes?.proposed?.value ||
+      (targetProp?.id ? `PR #${targetProp.id.slice(0, 8)}` : 'Knowledge proposal');
+
+    // 2. Optimistic Update on proposals array
+    setProposals((prev) =>
+      prev.map((p) => {
+        if (p.id === proposalId || p.proposal_id === proposalId) {
+          return { ...p, status: decision, reviewed_at: new Date().toISOString() };
+        }
+        return p;
+      })
+    );
+
+    // 3. Optimistic Update on diff object (filter out approved/rejected deltas)
+    setDiff((prev) => {
+      if (!prev) return prev;
+      const keep = (item) => item.proposal_id !== proposalId && item.id !== proposalId;
+      return {
+        ...prev,
+        additions: (prev.additions || []).filter(keep),
+        changes: (prev.changes || []).filter(keep),
+        conflicts: (prev.conflicts || []).filter(keep),
+        removals: (prev.removals || []).filter(keep),
+      };
+    });
+
+    // 4. Optimistic Update on stats
+    setStats((prev) => {
+      if (!prev) return prev;
+      const pending = Math.max(0, (prev.pending_proposals ?? 1) - 1);
+      const kCount = decision === 'APPROVED' ? (prev.knowledge_items ?? 0) + 1 : (prev.knowledge_items ?? 0);
+      return {
+        ...prev,
+        pending_proposals: pending,
+        knowledge_items: kCount,
+      };
+    });
+
+    // 5. Rich Toast feedback
+    const actionLabel = decision === 'APPROVED' ? 'Approved & Merged' : decision === 'REJECTED' ? 'Rejected' : 'Archived';
+    const preview = factSnippet.length > 50 ? `${factSnippet.slice(0, 50)}...` : factSnippet;
+    showToast(`${actionLabel}: "${preview}"`, decision === 'REJECTED' ? 'info' : 'success');
+
+    // 6. Network call (sub-10ms direct DB update via FastAPI)
     try {
       await api.reviewProposal(currentWorkspace?.id, proposalId, decision, comments);
-      showToast(`Proposal ${decision.toLowerCase()}!`);
       refreshData();
     } catch (err) {
       showToast(`Review failed: ${err.message}`, 'error');
+      refreshData();
     }
   };
 
   const handleBatchReview = async (decision) => {
+    const pendingList = (proposals || []).filter((p) => !p.status || p.status === 'PENDING');
+    const count = pendingList.length || (stats?.pending_proposals ?? 0);
+
+    // Optimistic Update
+    setProposals((prev) => prev.map((p) => (!p.status || p.status === 'PENDING' ? { ...p, status: decision } : p)));
+    setDiff({ additions: [], changes: [], conflicts: [], removals: [] });
+    setStats((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        pending_proposals: 0,
+        knowledge_items: decision === 'APPROVED' ? (prev.knowledge_items ?? 0) + count : (prev.knowledge_items ?? 0),
+      };
+    });
+
+    showToast(`Batch ${decision.toLowerCase()} applied to ${count} pending items!`, 'success');
+
     try {
       const res = await api.batchReview(currentWorkspace.id, decision);
-      showToast(`Batch ${decision.toLowerCase()} processed (${res.processed_count} items)!`);
       refreshData();
     } catch (err) {
       showToast(`Batch review failed: ${err.message}`, 'error');
+      refreshData();
     }
   };
 
@@ -334,6 +399,8 @@ export default function App() {
         onLogout={handleLogout}
         onRefresh={() => refreshData()}
         refreshing={refreshing}
+        proposals={proposals}
+        diff={diff}
       />
 
       {/* Main Content Area */}

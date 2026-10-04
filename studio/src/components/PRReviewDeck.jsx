@@ -22,7 +22,8 @@ export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatch
   const [selectedProposal, setSelectedProposal] = useState(null);
   const [filterStatus, setFilterStatus] = useState('PENDING');
   const [reviewComment, setReviewComment] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingDecision, setSubmittingDecision] = useState(null);
+  const [lastReviewed, setLastReviewed] = useState(null);
   // Auto-select proposal from URL if provided
   React.useEffect(() => {
     if (selectedProposalId && proposals?.length) {
@@ -50,10 +51,26 @@ export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatch
 
   const handleReview = async (decision) => {
     if (!activePR) return;
-    setIsSubmitting(true);
+    const currentPr = activePR;
+    const currentId = currentPr.id;
+    const currentTitle = currentPr.summary ||
+      currentPr.proposed_changes?.value ||
+      currentPr.proposed_changes?.proposed?.value ||
+      `PR #${currentId.slice(0, 8)}`;
+
+    setSubmittingDecision(decision);
+    setLastReviewed({
+      id: currentId,
+      decision,
+      title: currentTitle,
+      time: new Date().toLocaleTimeString()
+    });
+
+    // Auto-advance to the next pending PR immediately
+    const remaining = filteredProposals.filter((p) => p.id !== currentId);
+    setSelectedProposal(remaining[0] || null);
+
     try {
-      await onReviewProposal(activePR.id, decision, reviewComment);
-      setReviewComment('');
       if (decision === 'APPROVED') {
         confetti({
           particleCount: 70,
@@ -61,11 +78,12 @@ export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatch
           origin: { y: 0.6 },
         });
       }
-      // Select next PR
-      const next = filteredProposals.find((p) => p.id !== activePR.id);
-      setSelectedProposal(next || null);
+      await onReviewProposal(currentId, decision, reviewComment);
+      setReviewComment('');
+    } catch (err) {
+      console.error('Error in review proposal:', err);
     } finally {
-      setIsSubmitting(false);
+      setSubmittingDecision(null);
     }
   };
 
@@ -107,6 +125,62 @@ export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatch
           })}
         </div>
       </div>
+
+      {/* Reactive Recent Decision Banner */}
+      {lastReviewed && (
+        <div className={`p-4 rounded-xl border flex items-center justify-between transition-all duration-300 shadow-lg ${
+          lastReviewed.decision === 'APPROVED'
+            ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200'
+            : lastReviewed.decision === 'REJECTED'
+            ? 'bg-rose-950/40 border-rose-500/50 text-rose-200'
+            : 'bg-slate-900 border-slate-700 text-slate-300'
+        }`}>
+          <div className="flex items-center space-x-3">
+            {lastReviewed.decision === 'APPROVED' ? (
+              <span className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+                <CheckCircle2 className="w-5 h-5" />
+              </span>
+            ) : (
+              <span className="p-2 rounded-lg bg-rose-500/20 text-rose-400">
+                <XCircle className="w-5 h-5" />
+              </span>
+            )}
+            <div>
+              <div className="flex items-center space-x-2 text-xs font-bold">
+                <span>
+                  {lastReviewed.decision === 'APPROVED'
+                    ? '✓ Proposal Approved & Merged to Truth Register'
+                    : '✕ Proposal Rejected & Dismissed'}:
+                </span>
+                <span className="font-mono text-[11px] opacity-80">PR #{lastReviewed.id.slice(0, 8)}</span>
+                <span className="text-[10px] text-slate-400 font-normal">at {lastReviewed.time}</span>
+              </div>
+              <p className="text-xs text-slate-300 line-clamp-1 mt-0.5 font-sans">
+                "{lastReviewed.title}"
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3 text-xs">
+            {lastReviewed.decision === 'APPROVED' && (
+              <Link
+                to={`/workspaces/${workspaceId || 'default'}/knowledge`}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition text-xs flex items-center space-x-1"
+              >
+                <span>Truth Register</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+            <button
+              onClick={() => setLastReviewed(null)}
+              className="text-slate-400 hover:text-white text-lg px-1.5 py-0.5"
+              title="Dismiss"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
 
       {filteredProposals.length === 0 ? (
         <div className="bg-[#0C101A] border border-slate-800/80 rounded-2xl p-12 text-center shadow-inner space-y-4">
@@ -270,7 +344,7 @@ export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatch
                 </div>
 
                 {/* Reviewer Comment Box */}
-                {activePR.status === 'PENDING' && (
+                {activePR.status === 'PENDING' ? (
                   <div className="space-y-3 pt-2 border-t border-slate-800">
                     <label className="block text-xs font-semibold text-slate-300">Review Decision & Notes</label>
                     <textarea
@@ -285,8 +359,8 @@ export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatch
                     <div className="flex items-center justify-end space-x-2 pt-1 text-xs">
                       <button
                         onClick={() => handleReview('ARCHIVED')}
-                        disabled={isSubmitting}
-                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition font-medium flex items-center space-x-1.5"
+                        disabled={!!submittingDecision}
+                        className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition font-medium flex items-center space-x-1.5 disabled:opacity-50"
                       >
                         <Archive className="w-3.5 h-3.5" />
                         <span>Archive</span>
@@ -294,22 +368,67 @@ export default function PRReviewDeck({ proposals = [], onReviewProposal, onBatch
 
                       <button
                         onClick={() => handleReview('REJECTED')}
-                        disabled={isSubmitting}
-                        className="px-3.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 transition font-medium flex items-center space-x-1.5"
+                        disabled={!!submittingDecision}
+                        className="px-3.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 transition font-medium flex items-center space-x-1.5 disabled:opacity-50"
                       >
-                        <XCircle className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Reject PR</span>
+                        {submittingDecision === 'REJECTED' ? (
+                          <div className="w-3.5 h-3.5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                        )}
+                        <span>{submittingDecision === 'REJECTED' ? 'Rejecting...' : 'Reject PR'}</span>
                       </button>
 
                       <button
                         onClick={() => handleReview('APPROVED')}
-                        disabled={isSubmitting}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold transition flex items-center space-x-1.5 shadow-lg shadow-emerald-600/20"
+                        disabled={!!submittingDecision}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold transition flex items-center space-x-1.5 shadow-lg shadow-emerald-600/20 disabled:opacity-50"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Approve & Commit to Master</span>
+                        {submittingDecision === 'APPROVED' ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        <span>{submittingDecision === 'APPROVED' ? 'Committing...' : 'Approve & Commit to Master'}</span>
                       </button>
                     </div>
+                  </div>
+                ) : (
+                  <div className={`p-4 rounded-xl border space-y-2 mt-4 ${
+                    activePR.status === 'APPROVED'
+                      ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                      : 'bg-rose-950/30 border-rose-500/40 text-rose-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 font-bold text-xs">
+                        {activePR.status === 'APPROVED' ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-rose-400" />
+                        )}
+                        <span>Status: {activePR.status}</span>
+                        {activePR.reviewed_at && (
+                          <span className="text-[11px] text-slate-400 font-normal">
+                            ({new Date(activePR.reviewed_at).toLocaleTimeString()})
+                          </span>
+                        )}
+                      </div>
+
+                      {activePR.status === 'APPROVED' && (
+                        <Link
+                          to={`/workspaces/${workspaceId || 'default'}/knowledge`}
+                          className="text-xs text-emerald-400 hover:underline flex items-center space-x-1 font-semibold"
+                        >
+                          <span>View in Truth Register</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-300">
+                      {activePR.status === 'APPROVED'
+                        ? 'This knowledge proposal was reviewed and committed directly into the Master Truth Register.'
+                        : 'This knowledge proposal was rejected and is excluded from active truth retrieval.'}
+                    </p>
                   </div>
                 )}
               </div>

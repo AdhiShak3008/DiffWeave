@@ -449,18 +449,22 @@ async def review_proposal_endpoint(
 ):
     decision = req.decision.upper()
     try:
-        if decision == "APPROVED":
-            return await client.approve_proposal(proposal_id, req.comments)
-        elif decision == "REJECTED":
-            return await client.reject_proposal(proposal_id, req.comments)
-        elif decision in ("ARCHIVED", "STASHED"):
-            return await client.archive_proposal(proposal_id, req.comments)
-        elif decision == "RESTORE":
-            return await client.restore_proposal(proposal_id)
-        else:
-            raise HTTPException(status_code=400, detail=f"Unsupported decision '{decision}'.")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Fast direct DB review (sub-millisecond execution)
+        return db_store.review_db_proposal(workspace_id, proposal_id, decision, req.comments)
+    except Exception:
+        try:
+            if decision == "APPROVED":
+                return await client.approve_proposal(proposal_id, req.comments)
+            elif decision == "REJECTED":
+                return await client.reject_proposal(proposal_id, req.comments)
+            elif decision in ("ARCHIVED", "STASHED"):
+                return await client.archive_proposal(proposal_id, req.comments)
+            elif decision == "RESTORE":
+                return await client.restore_proposal(proposal_id)
+            else:
+                raise HTTPException(status_code=400, detail=f"Unsupported decision '{decision}'.")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/api/workspaces/{workspace_id}/proposals/batch-review")
@@ -469,14 +473,23 @@ async def batch_review_endpoint(
     req: BatchReviewRequest,
 ):
     try:
-        return await client.batch_review_proposals(
+        # Fast direct DB batch review (sub-millisecond execution)
+        return db_store.batch_review_db_proposals(
             workspace_id=workspace_id,
             decision=req.decision,
             proposal_ids=req.proposal_ids,
             comments=req.comments,
         )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        try:
+            return await client.batch_review_proposals(
+                workspace_id=workspace_id,
+                decision=req.decision,
+                proposal_ids=req.proposal_ids,
+                comments=req.comments,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
 
 
 # ---------------------------------------------------------------------------

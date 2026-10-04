@@ -42,7 +42,9 @@ export default function Navbar({
   currentUser,
   onLogout,
   onRefresh,
-  refreshing
+  refreshing,
+  proposals = [],
+  diff = null
 }) {
   const { theme, toggleTheme } = useTheme();
   const [showWsDropdown, setShowWsDropdown] = useState(false);
@@ -94,11 +96,20 @@ export default function Navbar({
 
   const totalDocs = stats?.total_documents ?? currentWorkspace?.d_count ?? 0;
   const verifiedFacts = stats?.knowledge_items ?? stats?.total_knowledge_items ?? currentWorkspace?.k_count ?? 0;
-  const pendingProposals = stats?.pending_proposals ?? 0;
+
+  // Reactively compute pending PR count from live proposals prop
+  const pendingProposalsCount = (proposals && proposals.length > 0)
+    ? proposals.filter((p) => !p.status || p.status.toUpperCase() === 'PENDING').length
+    : (stats?.pending_proposals ?? 0);
+
+  // Reactively compute pending diff deltas from live diff prop
+  const pendingDiffDeltasCount = diff
+    ? ((diff.additions?.length || 0) + (diff.changes?.length || 0) + (diff.conflicts?.length || 0) + (diff.removals?.length || 0))
+    : pendingProposalsCount;
 
   const tabs = [
-    { id: 'diff', label: 'Semantic Diff', icon: FileDiff, badge: pendingProposals > 0 ? `${pendingProposals}` : null },
-    { id: 'prs', label: 'PR Review Deck', icon: GitPullRequest, badge: pendingProposals > 0 ? `${pendingProposals} pending` : null },
+    { id: 'diff', label: 'Semantic Diff', icon: FileDiff, badge: pendingDiffDeltasCount > 0 ? `${pendingDiffDeltasCount}` : null },
+    { id: 'prs', label: 'PR Review Deck', icon: GitPullRequest, badge: pendingProposalsCount > 0 ? `${pendingProposalsCount} pending` : null },
     { id: 'graph', label: 'Knowledge Graph', icon: Network },
     { id: 'staging', label: 'Ingestion Staging', icon: Files, badge: totalDocs > 0 ? `${totalDocs} docs` : null },
     { id: 'rules', label: 'Policy Rules CI', icon: ShieldCheck },
