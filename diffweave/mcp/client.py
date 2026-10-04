@@ -162,12 +162,28 @@ class DiffWeaveMCPClient:
 
             if ws_id:
                 try:
+                    import uuid
                     from mcp_server import Workspace, User
-                    ws = db.query(Workspace).filter(Workspace.id == ws_id).first()
+                    from sqlalchemy import func
+                    is_uuid = False
+                    try:
+                        uuid.UUID(str(ws_id).strip())
+                        is_uuid = True
+                    except Exception:
+                        pass
+
+                    if is_uuid:
+                        ws = db.query(Workspace).filter(Workspace.id == str(ws_id).strip()).first()
+                    else:
+                        ws = db.query(Workspace).filter(func.lower(Workspace.name) == str(ws_id).strip().lower()).first()
+
                     if ws and ws.created_by:
                         user = db.query(User).filter(User.id == ws.created_by).first()
                 except Exception:
-                    pass
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
 
             if not user:
                 try:

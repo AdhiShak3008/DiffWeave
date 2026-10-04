@@ -18,6 +18,7 @@ def validate_command(
     workspace_id: Optional[str] = typer.Option(None, "--workspace", "-w", help="Workspace UUID override"),
     proposal_id: Optional[str] = typer.Option(None, "--proposal", "-p", help="Validate a specific proposal UUID"),
     as_json: bool = typer.Option(False, "--json", help="Output machine-readable JSON"),
+    strict: bool = typer.Option(True, "--strict/--no-strict", help="Exit with non-zero code on violations (ideal for CI/CD)"),
 ):
     """
     Run policy rule validation (CI linter) on knowledge proposals.
@@ -41,6 +42,8 @@ def validate_command(
 
     if as_json:
         print_json(val_res)
+        if strict and not compliant:
+            raise typer.Exit(code=1)
         return
 
     rules_total = val_res.get("rules_total", 0)
@@ -95,3 +98,6 @@ def validate_command(
         )
 
     console.print(table)
+
+    if strict and not compliant:
+        raise typer.Exit(code=1)
