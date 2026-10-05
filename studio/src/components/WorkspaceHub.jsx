@@ -149,7 +149,14 @@ export default function WorkspaceHub({
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    const finalName = wsName.trim() || suggestedName;
+    const finalName = (wsName.trim() || suggestedName).trim();
+    const isDuplicate = (workspaces || []).some(
+      (w) => w.name && w.name.trim().toLowerCase() === finalName.toLowerCase()
+    );
+    if (isDuplicate) {
+      alert(`A workspace named "${finalName}" already exists. Workspace names must be unique.`);
+      return;
+    }
     await onCreateWorkspace(finalName, wsDesc.trim());
     setWsName('');
     setWsDesc('');

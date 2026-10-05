@@ -36,6 +36,24 @@ def init_command(
     """
     client = DiffWeaveMCPClient()
 
+    # Load authenticated identity
+    from diffweave.cli.credentials import load_credentials
+    creds = load_credentials()
+    auth_email = creds.get("email") if creds else None
+    current_uid = None
+
+    try:
+        from diffweave.bridge.db_store import get_engine
+        from sqlalchemy import text
+        eng = get_engine()
+        with eng.connect() as conn:
+            if auth_email:
+                u_row = conn.execute(text("SELECT id FROM users WHERE LOWER(email)=:e"), {"e": auth_email.lower()}).first()
+                if u_row:
+                    current_uid = str(u_row[0])
+    except Exception:
+        pass
+
     try:
         # Check MCP server availability and get available workspaces
         workspaces = client.call_tool_sync("list_workspaces")
@@ -46,8 +64,33 @@ def init_command(
     target_name = (create or workspace or "").strip()
 
     if create:
+        clean_create = create.strip()
+        # Enforce unique workspace name check
         try:
-            target_ws = client.call_tool_sync("create_workspace", {"name": create.strip()})
+            from diffweave.bridge.db_store import get_engine
+            from sqlalchemy import text
+            eng = get_engine()
+            with eng.connect() as conn:
+                if current_uid:
+                    existing = conn.execute(
+                        text("SELECT id, name FROM workspaces WHERE created_by = :uid AND LOWER(TRIM(name)) = LOWER(TRIM(:n)) AND (status != 'DELETED' OR status IS NULL)"),
+                        {"uid": current_uid, "n": clean_create}
+                    ).first()
+                else:
+                    existing = conn.execute(
+                        text("SELECT id, name FROM workspaces WHERE LOWER(TRIM(name)) = LOWER(TRIM(:n)) AND (status != 'DELETED' OR status IS NULL)"),
+                        {"n": clean_create}
+                    ).first()
+                if existing:
+                    print_error(f"Error: A workspace named '{clean_create}' already exists. Workspace names must be unique.")
+                    raise typer.Exit(code=1)
+        except typer.Exit:
+            raise
+        except Exception:
+            pass
+
+        try:
+            target_ws = client.call_tool_sync("create_workspace", {"name": clean_create})
             if not as_json:
                 print_success(f"Created new DocWeave workspace: [bold]{target_ws['name']}[/bold] ({target_ws['id']})")
         except Exception as e:
@@ -55,7 +98,7 @@ def init_command(
             raise typer.Exit(code=1)
 
     elif target_name:
-        # 1. Match by Workspace Name (case-insensitive) or UUID in retrieved workspaces
+        # 1. Match by Workspace Name or UUID in user's workspaces
         target_ws = next(
             (
                 w for w in workspaces
@@ -65,34 +108,35 @@ def init_command(
             None,
         )
 
-        # 2. Check local database directly (including case-insensitive name match)
+        # 2. Check database directly (ensuring user ownership scoping)
         if not target_ws:
             try:
-                from mcp_server import get_db, Workspace, WorkspaceStatus
-                from sqlalchemy import func
-                db = get_db()
-                ws_row = (
-                    db.query(Workspace)
-                    .filter(
-                        (func.lower(Workspace.name) == target_name.lower())
-                        | (Workspace.id == target_name)
-                    )
-                    .first()
-                )
-                if ws_row:
-                    if ws_row.status != WorkspaceStatus.ACTIVE:
-                        ws_row.status = WorkspaceStatus.ACTIVE
-                        db.commit()
-                    target_ws = {
-                        "id": str(ws_row.id),
-                        "name": ws_row.name,
-                        "description": ws_row.description or "",
-                    }
-                db.close()
+                from diffweave.bridge.db_store import get_engine
+                from sqlalchemy import text
+                eng = get_engine()
+                with eng.connect() as conn:
+                    if current_uid:
+                        # Scoped to current authenticated user
+                        ws_row = conn.execute(
+                            text("SELECT id, name, description FROM workspaces WHERE created_by = :uid AND (LOWER(TRIM(name)) = LOWER(TRIM(:n)) OR id::text = :n) AND (status != 'DELETED' OR status IS NULL)"),
+                            {"uid": current_uid, "n": target_name}
+                        ).first()
+                    else:
+                        ws_row = conn.execute(
+                            text("SELECT id, name, description FROM workspaces WHERE (LOWER(TRIM(name)) = LOWER(TRIM(:n)) OR id::text = :n) AND (status != 'DELETED' OR status IS NULL)"),
+                            {"n": target_name}
+                        ).first()
+
+                    if ws_row:
+                        target_ws = {
+                            "id": str(ws_row[0]),
+                            "name": ws_row[1],
+                            "description": ws_row[2] or "",
+                        }
             except Exception:
                 pass
 
-        # 3. If workspace does not exist yet, auto-create it by name
+        # 3. If workspace does not exist yet for this user, auto-create it under their account
         if not target_ws:
             try:
                 target_ws = client.call_tool_sync("create_workspace", {"name": target_name})

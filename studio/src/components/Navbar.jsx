@@ -88,8 +88,16 @@ export default function Navbar({
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!newWsName.trim()) return;
-    await onCreateWorkspace(newWsName.trim());
+    const cleanName = newWsName.trim();
+    if (!cleanName) return;
+    const isDuplicate = (workspaces || []).some(
+      (w) => w.name && w.name.trim().toLowerCase() === cleanName.toLowerCase()
+    );
+    if (isDuplicate) {
+      alert(`A workspace named "${cleanName}" already exists. Workspace names must be unique.`);
+      return;
+    }
+    await onCreateWorkspace(cleanName);
     setNewWsName('');
     setShowCreateModal(false);
   };

@@ -287,7 +287,7 @@ async def get_workspaces(authorization: str = Header(None)):
 
         eng = docweave_auth.get_engine()
         with eng.connect() as conn:
-            # If user is authenticated, query their workspaces first
+            # If user is authenticated, query their active workspaces first
             if user and user.get("id"):
                 rows = conn.execute(
                     text("""
@@ -296,6 +296,7 @@ async def get_workspaces(authorization: str = Header(None)):
                                (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
                         FROM workspaces w
                         WHERE w.created_by = :uid
+                          AND (w.status != 'DELETED' OR w.status IS NULL)
                         ORDER BY k_count DESC, w.created_at DESC
                     """),
                     {"uid": user["id"]}
@@ -312,13 +313,14 @@ async def get_workspaces(authorization: str = Header(None)):
                         for r in rows
                     ]
 
-            # If evaluator/demo or no workspaces for user, return all workspaces
+            # If evaluator/demo or no workspaces for user, return active workspaces (excluding deleted)
             rows = conn.execute(
                 text("""
                     SELECT w.id, w.name, w.description,
                            (SELECT count(*) FROM knowledge_items WHERE workspace_id = w.id) as k_count,
                            (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
                     FROM workspaces w
+                    WHERE (w.status != 'DELETED' OR w.status IS NULL)
                     ORDER BY k_count DESC, w.created_at DESC
                 """)
             ).fetchall()
@@ -340,9 +342,73 @@ async def get_workspaces(authorization: str = Header(None)):
 
 
 @app.post("/api/workspaces")
-async def create_workspace(req: CreateWorkspaceRequest):
+async def create_workspace(req: CreateWorkspaceRequest, authorization: str = Header(None)):
+    clean_name = req.name.strip()
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Workspace name cannot be empty.")
+
     try:
-        return await client.create_workspace(name=req.name, description=req.description)
+        from sqlalchemy import text
+        import uuid
+        user = None
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.split(" ", 1)[1].strip()
+            user = docweave_auth.get_current_user_from_token(token)
+
+        eng = docweave_auth.get_engine()
+        user_id = user["id"] if user and user.get("id") else None
+
+        # Check for duplicate workspace name
+        with eng.connect() as conn:
+            if user_id:
+                dup = conn.execute(
+                    text("""
+                        SELECT id, name FROM workspaces
+                        WHERE created_by = :uid
+                          AND LOWER(TRIM(name)) = LOWER(TRIM(:name))
+                          AND (status != 'DELETED' OR status IS NULL)
+                    """),
+                    {"uid": user_id, "name": clean_name}
+                ).first()
+            else:
+                dup = conn.execute(
+                    text("""
+                        SELECT id, name FROM workspaces
+                        WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name))
+                          AND (status != 'DELETED' OR status IS NULL)
+                    """),
+                    {"name": clean_name}
+                ).first()
+
+            if dup:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"A workspace named '{clean_name}' already exists. Workspace names must be unique."
+                )
+
+        # Create new workspace directly in DB with authenticated ownership
+        ws_id = str(uuid.uuid4())
+        owner_id = user_id or "59a0fed0-17c7-4013-82fc-985f5d1ee623"
+        with eng.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO workspaces (id, name, description, created_by, status, created_at, updated_at)
+                    VALUES (:id, :name, :desc, :uid, 'ACTIVE', NOW(), NOW())
+                """),
+                {"id": ws_id, "name": clean_name, "desc": req.description or "", "uid": owner_id}
+            )
+
+        return {
+            "id": ws_id,
+            "name": clean_name,
+            "description": req.description or "",
+            "status": "ACTIVE",
+            "created_by": owner_id,
+            "d_count": 0,
+            "k_count": 0,
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

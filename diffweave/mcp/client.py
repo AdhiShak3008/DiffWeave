@@ -134,6 +134,18 @@ class DiffWeaveMCPClient:
         db = get_db()
         try:
             user = None
+            # 1. Resolve user from authenticated CLI credentials first
+            try:
+                from diffweave.cli.credentials import load_credentials
+                creds = load_credentials()
+                if creds and creds.get("email"):
+                    from mcp_server import User
+                    u = db.query(User).filter(User.email == creds["email"].strip().lower()).first()
+                    if u:
+                        user = u
+            except Exception:
+                pass
+
             ws_id = arguments.get("workspace_id")
             if not ws_id and "document_id" in arguments:
                 try:

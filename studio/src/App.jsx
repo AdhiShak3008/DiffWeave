@@ -207,18 +207,30 @@ export default function App() {
 
   // Actions
   const handleCreateWorkspace = async (name, desc) => {
+    const cleanName = (name || '').trim();
+    if (!cleanName) {
+      showToast('Workspace name cannot be empty', 'error');
+      return;
+    }
+    const isDuplicate = (workspaces || []).some(
+      (w) => w.name && w.name.trim().toLowerCase() === cleanName.toLowerCase()
+    );
+    if (isDuplicate) {
+      showToast(`A workspace named "${cleanName}" already exists. Please choose a unique name.`, 'error');
+      return;
+    }
     try {
-      const newWs = await api.createWorkspace(name, desc);
+      const newWs = await api.createWorkspace(cleanName, desc);
       const wsItem = {
         ...newWs,
-        name: newWs.name || name,
+        name: newWs.name || cleanName,
         description: newWs.description || desc,
         d_count: 0,
         k_count: 0
       };
       setWorkspaces((prev) => [wsItem, ...prev]);
       setCurrentWorkspace(wsItem);
-      showToast(`Workspace "${name}" created! Follow CLI instructions to populate.`);
+      showToast(`Workspace "${cleanName}" created! Follow CLI instructions to populate.`);
       navigate(`/workspaces/${wsItem.id}/quickstart`);
     } catch (err) {
       showToast(`Create failed: ${err.message}`, 'error');

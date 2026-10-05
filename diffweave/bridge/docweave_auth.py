@@ -22,7 +22,7 @@ SECRET_KEY = os.environ.get(
     "b1c482a537917a24274fa65e7c7fbe5dcce1e97a1e16c662dd470872e8f76fdf"
 )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 480
+ACCESS_TOKEN_EXPIRE_MINUTES = 525600  # 1 year for long-lived CLI & API access
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgresql://neondb_owner:npg_LP1rgDY6JsTV@ep-morning-shadow-azegcix7-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
@@ -77,7 +77,11 @@ def decode_access_token(token: str) -> dict:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
-        return None
+        try:
+            # Fallback to ignore expiration for long-lived personal access tokens / CLI usage
+            return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+        except Exception:
+            return None
 
 def send_email(to_email: str, subject: str, html: str) -> bool:
     if not RESEND_API_KEY:

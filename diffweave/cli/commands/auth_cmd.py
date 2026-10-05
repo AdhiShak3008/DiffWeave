@@ -41,6 +41,30 @@ def login_command(
         except Exception:
             pass
 
+        # If still default token-user, decode JWT claims to extract user identity
+        if email == "token-user":
+            try:
+                from jose import jwt as jose_jwt
+                claims = jose_jwt.get_unverified_claims(token)
+                sub = claims.get("sub")
+                if sub and "@" in sub:
+                    email = sub
+                    username = sub.split("@")[0]
+                    # Check DB for full user name
+                    try:
+                        from diffweave.bridge.db_store import get_engine
+                        from sqlalchemy import text
+                        eng = get_engine()
+                        with eng.connect() as conn:
+                            row = conn.execute(text("SELECT username, email FROM users WHERE LOWER(email)=:e"), {"e": email.lower()}).first()
+                            if row:
+                                username = row[0]
+                                email = row[1]
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
         save_credentials(access_token=token, email=email, username=username, mcp_url=server_url)
         print_success(f"Successfully authenticated as [bold white]{username}[/bold white] ({email})!")
         print_info(f"  Stored in: ~/.diffweave/credentials.json")
