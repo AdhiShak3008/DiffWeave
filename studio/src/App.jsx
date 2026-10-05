@@ -594,6 +594,9 @@ export default function App() {
                     loading={loading}
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
+                    setActiveTab={handleTabChange}
+                    pendingProposalsCount={(proposals || []).filter((p) => !p.status || p.status.toUpperCase() === 'PENDING').length}
+                    onApproveAll={() => handleBatchReview('APPROVED')}
                   />
                 )}
 

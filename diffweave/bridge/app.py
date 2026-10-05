@@ -547,8 +547,8 @@ async def get_proposals(
     try:
         filter_status = None if (not status or status.upper() == "ALL") else status.upper()
         props = db_store.get_db_proposals(workspace_id, status=filter_status)
-        if not props and status and status.upper() == "PENDING":
-            props = await client.list_pending_proposals(workspace_id, document_version_id)
+        if not props:
+            props = await client.list_proposals(workspace_id, status=filter_status)
         return props
     except Exception:
         return db_store.get_db_proposals(workspace_id)
@@ -657,9 +657,9 @@ async def get_knowledge_endpoint(
     status: Optional[str] = Query(None),
 ):
     try:
-        items = await client.list_knowledge(workspace_id, type=type, status=status)
+        items = db_store.get_db_knowledge_items(workspace_id, type=type, status=status)
         if not items:
-            items = db_store.get_db_knowledge_items(workspace_id, type=type, status=status)
+            items = await client.list_knowledge(workspace_id, type=type, status=status)
         return items
     except Exception:
         return db_store.get_db_knowledge_items(workspace_id, type=type, status=status)
