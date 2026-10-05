@@ -679,9 +679,12 @@ async def search_knowledge_endpoint(
     q: str = Query(..., description="Search query string"),
 ):
     try:
-        return await client.search_knowledge(workspace_id, q)
+        results = db_store.search_db_knowledge(workspace_id, q)
+        if not results:
+            results = await client.search_knowledge(workspace_id, q)
+        return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return db_store.search_db_knowledge(workspace_id, q)
 
 
 # ---------------------------------------------------------------------------

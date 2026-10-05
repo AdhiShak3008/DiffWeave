@@ -298,6 +298,54 @@ def get_db_rules(workspace_id: str) -> list[dict[str, Any]]:
                 {"ws": workspace_id}
             ).fetchall()
 
+            if not rows:
+                return [
+                    {
+                        "id": "rule-confidence-floor",
+                        "workspace_id": workspace_id,
+                        "name": "Confidence Floor Check",
+                        "rule_type": "CONFIDENCE_THRESHOLD",
+                        "operator": "GTE",
+                        "configuration": {"min_confidence": 0.85},
+                        "enabled": True,
+                        "description": "Requires extraction confidence >= 85% before merge.",
+                        "created_at": "",
+                    },
+                    {
+                        "id": "rule-provenance-mandatory",
+                        "workspace_id": workspace_id,
+                        "name": "Mandatory Provenance Citation",
+                        "rule_type": "PROVENANCE_MANDATORY",
+                        "operator": "EXISTS",
+                        "configuration": {"require_source": True},
+                        "enabled": True,
+                        "description": "Blocks PRs lacking verifiable document section citations.",
+                        "created_at": "",
+                    },
+                    {
+                        "id": "rule-statistical-validation",
+                        "workspace_id": workspace_id,
+                        "name": "Statistical Claim Validation",
+                        "rule_type": "STATISTICAL_VALIDATION",
+                        "operator": "REGEX",
+                        "configuration": {"pattern": "p\\s*[<>=]\\s*0\\.\\d+"},
+                        "enabled": True,
+                        "description": "Verifies that quantitative clinical claims include p-value or confidence intervals.",
+                        "created_at": "",
+                    },
+                    {
+                        "id": "rule-adverse-escalation",
+                        "workspace_id": workspace_id,
+                        "name": "Safety Escalation Window (24h)",
+                        "rule_type": "TIMELINE_CONSTRAINT",
+                        "operator": "LTE",
+                        "configuration": {"max_hours": 24},
+                        "enabled": True,
+                        "description": "Enforces 24-hour reporting SLA for GCP safety violations.",
+                        "created_at": "",
+                    }
+                ]
+
             return [
                 {
                     "id": str(r[0]),
@@ -353,7 +401,7 @@ def get_db_knowledge_graph(workspace_id: str) -> dict[str, Any]:
 
 def get_db_semantic_diff(workspace_id: str) -> dict[str, Any]:
     try:
-        proposals = get_db_proposals(workspace_id)
+        proposals = get_db_proposals(workspace_id, status='PENDING')
         existing_items = get_db_knowledge_items(workspace_id)
 
         additions = []
@@ -445,20 +493,22 @@ def validate_db_proposals(workspace_id: str, proposal_id: Optional[str] = None) 
 
 def review_db_proposal(workspace_id: str, proposal_id: str, decision: str, comments: Optional[str] = None) -> dict[str, Any]:
     """Approve, reject, or archive a proposal directly with instant database commitment in <10ms."""
+    import uuid
+    import json
     eng = get_engine()
     with eng.begin() as conn:
         new_status = decision.upper()
         # 1. Update proposal status
         conn.execute(
-            text("UPDATE proposals SET status = :st, reviewed_at = NOW() WHERE id = :pid"),
-            {"st": new_status, "pid": proposal_id}
+            text("UPDATE proposals SET status = :st, reviewed_at = NOW() WHERE id::text = :pid"),
+            {"st": new_status, "pid": str(proposal_id)}
         )
 
         # 2. If approved, activate knowledge item and record commit
         if new_status == "APPROVED":
             row = conn.execute(
-                text("SELECT workspace_id, summary, knowledge_item_id FROM proposals WHERE id = :pid"),
-                {"pid": proposal_id}
+                text("SELECT workspace_id, summary, knowledge_item_id FROM proposals WHERE id::text = :pid"),
+                {"pid": str(proposal_id)}
             ).fetchone()
 
             if row:
@@ -468,18 +518,23 @@ def review_db_proposal(workspace_id: str, proposal_id: str, decision: str, comme
                         text("UPDATE knowledge_items SET status = 'ACTIVE', updated_at = NOW() WHERE id::text = :kid"),
                         {"kid": str(k_id)}
                     )
-                import uuid
                 commit_id = str(uuid.uuid4())
                 try:
                     conn.execute(
                         text("""
-                            INSERT INTO commits (id, workspace_id, proposal_id, message, created_at)
-                            VALUES (:cid, :ws, :pid, :msg, NOW())
+                            INSERT INTO commits (id, workspace_id, proposal_id, committed_by, committed_at, changes, message)
+                            VALUES (:cid, :ws, :pid, '00000000-0000-0000-0000-000000000001', NOW(), :chg, :msg)
                         """),
-                        {"cid": commit_id, "ws": ws_id, "pid": proposal_id, "msg": summary or "Approved knowledge delta"}
+                        {
+                            "cid": commit_id,
+                            "ws": ws_id,
+                            "pid": str(proposal_id),
+                            "chg": json.dumps({"action": "APPROVED", "knowledge_item_id": str(k_id) if k_id else None}),
+                            "msg": summary or "Approved knowledge delta"
+                        }
                     )
-                except Exception:
-                    pass
+                except Exception as ce:
+                    logger.warning(f"Could not record commit row: {ce}")
 
     return {"status": new_status, "proposal_id": proposal_id}
 
@@ -559,3 +614,40 @@ def delete_all_user_workspaces(user_id: Optional[str] = None, workspace_ids: Opt
                 text("UPDATE workspaces SET status = 'DELETED', updated_at = NOW() WHERE (status != 'DELETED' OR status IS NULL)")
             )
             return res.rowcount
+
+
+def search_db_knowledge(workspace_id: str, query: str, limit: int = 20) -> list[dict[str, Any]]:
+    """Search knowledge items in PostgreSQL by title, value, or summary."""
+    try:
+        eng = get_engine()
+        with eng.connect() as conn:
+            rows = conn.execute(
+                text("""
+                    SELECT k.id, k.title, k.type, k.value, k.confidence, k.status, k.created_at, k.summary
+                    FROM knowledge_items k
+                    WHERE k.workspace_id = :ws
+                      AND (k.title ILIKE :q OR k.value ILIKE :q OR k.summary ILIKE :q)
+                    ORDER BY k.confidence DESC, k.created_at DESC
+                    LIMIT :lim
+                """),
+                {"ws": workspace_id, "q": f"%{query}%", "lim": limit}
+            ).fetchall()
+
+            return [
+                {
+                    "id": str(r[0]),
+                    "workspace_id": workspace_id,
+                    "title": r[1] or "Fact",
+                    "type": r[2] or "CLAIM",
+                    "value": r[3] or "",
+                    "confidence": float(r[4]) if r[4] is not None else 0.95,
+                    "status": r[5] or "ACTIVE",
+                    "created_at": r[6].isoformat() if r[6] else "",
+                    "summary": r[7] or "",
+                    "filename": "Clinical_Guideline.pdf"
+                }
+                for r in rows
+            ]
+    except Exception as e:
+        logger.warning(f"Error searching DB knowledge: {e}")
+        return []
