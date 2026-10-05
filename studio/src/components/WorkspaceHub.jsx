@@ -183,7 +183,8 @@ export default function WorkspaceHub({
         if (onBatchDeleteWorkspaces) await onBatchDeleteWorkspaces(selectedWsIds, false);
         setSelectedWsIds([]);
       } else if (confirmDeleteModal.type === 'all') {
-        if (onBatchDeleteWorkspaces) await onBatchDeleteWorkspaces([], true);
+        const allIds = safeWorkspaces.map((w) => w.id);
+        if (onBatchDeleteWorkspaces) await onBatchDeleteWorkspaces(allIds, true);
         setSelectedWsIds([]);
       }
       setConfirmDeleteModal(null);

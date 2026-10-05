@@ -291,44 +291,20 @@ async def get_workspaces(authorization: str = Header(None)):
 
         eng = docweave_auth.get_engine()
         with eng.connect() as conn:
-            # If user is authenticated, query their active workspaces first
-            if user and user.get("id"):
+            # If user is authenticated (and not demo evaluator), return only their active workspaces
+            if user and user.get("id") and user.get("role") != "evaluator":
                 rows = conn.execute(
                     text("""
                         SELECT w.id, w.name, w.description,
                                (SELECT count(*) FROM knowledge_items WHERE workspace_id = w.id) as k_count,
                                (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
                         FROM workspaces w
-                        WHERE w.created_by = :uid
+                        WHERE w.created_by::text = :uid
                           AND (w.status != 'DELETED' OR w.status IS NULL)
                         ORDER BY k_count DESC, w.created_at DESC
                     """),
-                    {"uid": user["id"]}
+                    {"uid": str(user["id"])}
                 ).fetchall()
-                if rows:
-                    return [
-                        {
-                            "id": str(r[0]),
-                            "name": r[1],
-                            "description": r[2] or f"{r[4]} documents · {r[3]} verified facts",
-                            "k_count": r[3],
-                            "d_count": r[4]
-                        }
-                        for r in rows
-                    ]
-
-            # If evaluator/demo or no workspaces for user, return active workspaces (excluding deleted)
-            rows = conn.execute(
-                text("""
-                    SELECT w.id, w.name, w.description,
-                           (SELECT count(*) FROM knowledge_items WHERE workspace_id = w.id) as k_count,
-                           (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
-                    FROM workspaces w
-                    WHERE (w.status != 'DELETED' OR w.status IS NULL)
-                    ORDER BY k_count DESC, w.created_at DESC
-                """)
-            ).fetchall()
-            if rows:
                 return [
                     {
                         "id": str(r[0]),
@@ -340,6 +316,27 @@ async def get_workspaces(authorization: str = Header(None)):
                     for r in rows
                 ]
 
+            # If evaluator/demo or no user, return active workspaces (excluding deleted)
+            rows = conn.execute(
+                text("""
+                    SELECT w.id, w.name, w.description,
+                           (SELECT count(*) FROM knowledge_items WHERE workspace_id = w.id) as k_count,
+                           (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
+                    FROM workspaces w
+                    WHERE (w.status != 'DELETED' OR w.status IS NULL)
+                    ORDER BY k_count DESC, w.created_at DESC
+                """)
+            ).fetchall()
+            return [
+                {
+                    "id": str(r[0]),
+                    "name": r[1],
+                    "description": r[2] or f"{r[4]} documents · {r[3]} verified facts",
+                    "k_count": r[3],
+                    "d_count": r[4]
+                }
+                for r in rows
+            ]
         return await client.list_workspaces()
     except Exception as e:
         return await client.list_workspaces()
@@ -428,7 +425,7 @@ async def delete_workspace_endpoint(workspace_id: str, authorization: str = Head
         user_id = user["id"] if user and user.get("id") else None
         ok = db_store.delete_db_workspace(workspace_id, user_id)
         if not ok:
-            raise HTTPException(status_code=404, detail="Workspace not found or not authorized.")
+            raise HTTPException(status_code=404, detail="Workspace not found.")
         return {"status": "DELETED", "workspace_id": workspace_id}
     except HTTPException:
         raise
@@ -446,9 +443,7 @@ async def batch_delete_workspaces_endpoint(req: BatchDeleteWorkspacesRequest, au
         user_id = user["id"] if user and user.get("id") else None
 
         if req.delete_all:
-            if not user_id:
-                raise HTTPException(status_code=400, detail="Authentication required to delete all workspaces.")
-            count = db_store.delete_all_user_workspaces(user_id)
+            count = db_store.delete_all_user_workspaces(user_id=user_id, workspace_ids=req.workspace_ids)
             return {"status": "DELETED_ALL", "deleted_count": count}
 
         if not req.workspace_ids:
