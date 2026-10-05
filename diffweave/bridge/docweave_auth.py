@@ -202,7 +202,23 @@ def login(email_or_username: str, password: str) -> dict:
         }
     }
 
+def ensure_evaluator_user():
+    """Ensure the evaluator user exists in the PostgreSQL users table to satisfy foreign keys."""
+    eng = get_engine()
+    try:
+        with eng.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO users (id, username, email, hashed_password, role)
+                    VALUES ('00000000-0000-0000-0000-000000000001', 'DocWeave Evaluator', 'evaluator@docweave.io', '$2b$12$demo.evaluator.placeholder.hash.cannot.login.with.password', 'evaluator')
+                    ON CONFLICT (id) DO NOTHING
+                """)
+            )
+    except Exception as e:
+        logger.warning(f"Could not provision evaluator user: {e}")
+
 def demo_login() -> dict:
+    ensure_evaluator_user()
     email = "evaluator@docweave.io"
     username = "DocWeave Evaluator"
     user_id = "00000000-0000-0000-0000-000000000001"
