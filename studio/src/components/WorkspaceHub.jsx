@@ -77,6 +77,91 @@ export default function WorkspaceHub({
     );
   };
 
+  // Settings state
+  const [confidenceThreshold, setConfidenceThreshold] = useState(() => {
+    return parseInt(localStorage.getItem('diffweave_conf_threshold') || '85', 10);
+  });
+  const [mcpUrl, setMcpUrl] = useState(() => {
+    return localStorage.getItem('diffweave_mcp_url') || 'https://shak3008-diffweave.hf.space';
+  });
+  const [autoSyncInterval, setAutoSyncInterval] = useState('manual');
+  const [testConnStatus, setTestConnStatus] = useState(null); // 'testing' | 'connected' | 'error'
+  const [settingsSavedToast, setSettingsSavedToast] = useState(false);
+
+  // API Key copy state
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [showKeyRaw, setShowKeyRaw] = useState(false);
+
+  // GitHub-style Create Workspace form state
+  const [wsName, setWsName] = useState('');
+  const [wsDesc, setWsDesc] = useState('');
+  const [wsVisibility, setWsVisibility] = useState('public');
+  const [starterTemplate, setStarterTemplate] = useState('empty');
+  const [suggestedName] = useState(() => {
+    const suggestions = ['fuzzy-spork', 'neural-policy-v2', 'clinical-guidelines', 'rag-truth-matrix', 'legal-audit-2026'];
+    return suggestions[Math.floor(Math.random() * suggestions.length)];
+  });
+
+  const username = currentUser?.username || 'developer';
+  const displayName = currentUser?.username || 'developer';
+  const email = currentUser?.email || 'developer@diffweave.io';
+  const token = typeof window !== 'undefined' ? (localStorage.getItem('diffweave_token') || localStorage.getItem('token') || 'dw_live_sample_token') : 'dw_live_sample_token';
+
+  const totalDocuments = (workspaces || []).reduce((acc, w) => acc + (w.d_count ?? 0), 0);
+  const totalVerifiedFacts = (workspaces || []).reduce((acc, w) => acc + (w.k_count ?? 0), 0);
+
+  const handleCopyKey = () => {
+    navigator.clipboard.writeText(token);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 2000);
+  };
+
+  const handleTestConnection = async () => {
+    setTestConnStatus('testing');
+    try {
+      const res = await fetch(`${mcpUrl.replace(/\/$/, '')}/healthz`, { method: 'GET' });
+      if (res.ok) {
+        setTestConnStatus('connected');
+      } else {
+        setTestConnStatus('connected'); // Fallback connection active
+      }
+    } catch {
+      setTestConnStatus('connected');
+    }
+  };
+
+  const handleSaveSettings = () => {
+    localStorage.setItem('diffweave_conf_threshold', confidenceThreshold.toString());
+    localStorage.setItem('diffweave_mcp_url', mcpUrl.trim());
+    setSettingsSavedToast(true);
+    setTimeout(() => setSettingsSavedToast(false), 2500);
+    setShowSettingsModal(false);
+  };
+
+  const safeWorkspaces = workspaces || [];
+
+  // Filter & Sort Workspaces
+  const filteredWorkspaces = useMemo(() => {
+    let list = safeWorkspaces.filter((w) => {
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        (w.name && w.name.toLowerCase().includes(q)) ||
+        (w.description && w.description.toLowerCase().includes(q)) ||
+        (w.id && w.id.toLowerCase().includes(q))
+      );
+    });
+
+    if (sortBy === 'docs') {
+      list.sort((a, b) => (b.d_count ?? 0) - (a.d_count ?? 0));
+    } else if (sortBy === 'facts') {
+      list.sort((a, b) => (b.k_count ?? 0) - (a.k_count ?? 0));
+    } else if (sortBy === 'name') {
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+    return list;
+  }, [safeWorkspaces, searchQuery, sortBy]);
+
   const isAllSelected = filteredWorkspaces.length > 0 && selectedWsIds.length === filteredWorkspaces.length;
 
   const handleSelectAll = () => {
@@ -108,89 +193,6 @@ export default function WorkspaceHub({
       setIsDeleting(false);
     }
   };
-
-  // Settings state
-  const [confidenceThreshold, setConfidenceThreshold] = useState(() => {
-    return parseInt(localStorage.getItem('diffweave_conf_threshold') || '85', 10);
-  });
-  const [mcpUrl, setMcpUrl] = useState(() => {
-    return localStorage.getItem('diffweave_mcp_url') || 'https://shak3008-diffweave.hf.space';
-  });
-  const [autoSyncInterval, setAutoSyncInterval] = useState('manual');
-  const [testConnStatus, setTestConnStatus] = useState(null); // 'testing' | 'connected' | 'error'
-  const [settingsSavedToast, setSettingsSavedToast] = useState(false);
-
-  // API Key copy state
-  const [copiedKey, setCopiedKey] = useState(false);
-  const [showKeyRaw, setShowKeyRaw] = useState(false);
-
-  // GitHub-style Create Workspace form state
-  const [wsName, setWsName] = useState('');
-  const [wsDesc, setWsDesc] = useState('');
-  const [wsVisibility, setWsVisibility] = useState('public');
-  const [starterTemplate, setStarterTemplate] = useState('empty');
-  const [suggestedName] = useState(() => {
-    const suggestions = ['fuzzy-spork', 'neural-policy-v2', 'clinical-guidelines', 'rag-truth-matrix', 'legal-audit-2026'];
-    return suggestions[Math.floor(Math.random() * suggestions.length)];
-  });
-
-  const username = currentUser?.username || 'developer';
-  const displayName = currentUser?.username || 'developer';
-  const email = currentUser?.email || 'developer@diffweave.io';
-  const token = typeof window !== 'undefined' ? (localStorage.getItem('diffweave_token') || localStorage.getItem('token') || 'dw_live_sample_token') : 'dw_live_sample_token';
-
-  const totalDocuments = workspaces.reduce((acc, w) => acc + (w.d_count ?? 0), 0);
-  const totalVerifiedFacts = workspaces.reduce((acc, w) => acc + (w.k_count ?? 0), 0);
-
-  const handleCopyKey = () => {
-    navigator.clipboard.writeText(token);
-    setCopiedKey(true);
-    setTimeout(() => setCopiedKey(false), 2000);
-  };
-
-  const handleTestConnection = async () => {
-    setTestConnStatus('testing');
-    try {
-      const res = await fetch(`${mcpUrl.replace(/\/$/, '')}/healthz`, { method: 'GET' });
-      if (res.ok) {
-        setTestConnStatus('connected');
-      } else {
-        setTestConnStatus('connected'); // Fallback connection active
-      }
-    } catch {
-      setTestConnStatus('connected');
-    }
-  };
-
-  const handleSaveSettings = () => {
-    localStorage.setItem('diffweave_conf_threshold', confidenceThreshold.toString());
-    localStorage.setItem('diffweave_mcp_url', mcpUrl.trim());
-    setSettingsSavedToast(true);
-    setTimeout(() => setSettingsSavedToast(false), 2500);
-    setShowSettingsModal(false);
-  };
-
-  // Filter & Sort Workspaces
-  const filteredWorkspaces = useMemo(() => {
-    let list = workspaces.filter((w) => {
-      const q = searchQuery.toLowerCase().trim();
-      if (!q) return true;
-      return (
-        (w.name && w.name.toLowerCase().includes(q)) ||
-        (w.description && w.description.toLowerCase().includes(q)) ||
-        (w.id && w.id.toLowerCase().includes(q))
-      );
-    });
-
-    if (sortBy === 'docs') {
-      list.sort((a, b) => (b.d_count ?? 0) - (a.d_count ?? 0));
-    } else if (sortBy === 'facts') {
-      list.sort((a, b) => (b.k_count ?? 0) - (a.k_count ?? 0));
-    } else if (sortBy === 'name') {
-      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    }
-    return list;
-  }, [workspaces, searchQuery, sortBy]);
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();

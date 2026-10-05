@@ -1,3 +1,4 @@
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
@@ -28,7 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               path="/*"
               element={
                 <ProtectedRoute>
-                  <App />
+                  <ErrorBoundary><App /></ErrorBoundary>
                 </ProtectedRoute>
               }
             />
