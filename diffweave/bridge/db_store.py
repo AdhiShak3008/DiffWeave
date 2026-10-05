@@ -56,6 +56,24 @@ def get_db_workspace_status(workspace_id: str) -> dict[str, Any]:
             "pending_proposals": 0,
         }
 
+def insert_db_document(workspace_id: str, title: str, doc_type: str = "GENERAL") -> str:
+    """Insert a document record into PostgreSQL documents table."""
+    import uuid
+    doc_id = str(uuid.uuid4())
+    eng = get_engine()
+    try:
+        with eng.begin() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO documents (id, workspace_id, title, document_type, created_at, updated_at)
+                    VALUES (:id, :ws, :title, :type, NOW(), NOW())
+                """),
+                {"id": doc_id, "ws": workspace_id, "title": title, "type": doc_type}
+            )
+    except Exception as e:
+        logger.warning(f"Could not insert document into DB: {e}")
+    return doc_id
+
 def get_db_documents(workspace_id: str) -> list[dict[str, Any]]:
     try:
         eng = get_engine()

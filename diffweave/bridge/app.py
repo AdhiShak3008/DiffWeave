@@ -504,7 +504,9 @@ async def upload_document_endpoint(
         tmp_path = tmp.name
 
     try:
-        result = await client.upload_document(workspace_id, tmp_path)
+        # Save to database
+        db_store.insert_db_document(workspace_id, file.filename)
+        result = await client.upload_document(workspace_id, tmp_path, filename=file.filename)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

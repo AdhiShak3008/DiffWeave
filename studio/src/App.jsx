@@ -569,6 +569,8 @@ export default function App() {
                     onUploadDocument={handleUpload}
                     currentWorkspace={currentWorkspace}
                     loading={loading}
+                    onSelectTab={handleTabChange}
+                    onRefresh={refreshData}
                   />
                 )}
 

@@ -240,8 +240,11 @@ class DiffWeaveMCPClient:
     async def list_documents(self, workspace_id: str) -> list[dict[str, Any]]:
         return await self.call_tool("list_documents", {"workspace_id": workspace_id})
 
-    async def upload_document(self, workspace_id: str, file_path: str) -> dict[str, Any]:
-        return await self.call_tool("upload_document", {"workspace_id": workspace_id, "file_path": file_path})
+    async def upload_document(self, workspace_id: str, file_path: str, filename: Optional[str] = None) -> dict[str, Any]:
+        payload = {"workspace_id": workspace_id, "file_path": file_path}
+        if filename:
+            payload["filename"] = filename
+        return await self.call_tool("upload_document", payload)
 
     async def delete_document(self, document_id: str) -> dict[str, Any]:
         return await self.call_tool("delete_document", {"document_id": document_id})
