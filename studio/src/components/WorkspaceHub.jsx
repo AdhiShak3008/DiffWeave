@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext.jsx';
 import {
   Layers,
+  Trash2,
+  AlertTriangle,
   Search,
   Plus,
   ArrowUpDown,
@@ -51,6 +53,8 @@ export default function WorkspaceHub({
   currentWorkspace,
   onSelectWorkspace,
   onCreateWorkspace,
+  onDeleteWorkspace,
+  onBatchDeleteWorkspaces,
   currentUser,
   onLogout
 }) {
@@ -63,6 +67,47 @@ export default function WorkspaceHub({
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showLearnMore, setShowLearnMore] = useState(false);
+  const [selectedWsIds, setSelectedWsIds] = useState([]);
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState(null); // { type: 'single' | 'selected' | 'all', ws?: wsItem, count?: number }
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const toggleSelectWs = (id) => {
+    setSelectedWsIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const isAllSelected = filteredWorkspaces.length > 0 && selectedWsIds.length === filteredWorkspaces.length;
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedWsIds([]);
+    } else {
+      setSelectedWsIds(filteredWorkspaces.map((w) => w.id));
+    }
+  };
+
+  const executeDelete = async () => {
+    if (!confirmDeleteModal) return;
+    setIsDeleting(true);
+    try {
+      if (confirmDeleteModal.type === 'single' && confirmDeleteModal.ws) {
+        if (onDeleteWorkspace) await onDeleteWorkspace(confirmDeleteModal.ws.id);
+        setSelectedWsIds((prev) => prev.filter((id) => id !== confirmDeleteModal.ws.id));
+      } else if (confirmDeleteModal.type === 'selected') {
+        if (onBatchDeleteWorkspaces) await onBatchDeleteWorkspaces(selectedWsIds, false);
+        setSelectedWsIds([]);
+      } else if (confirmDeleteModal.type === 'all') {
+        if (onBatchDeleteWorkspaces) await onBatchDeleteWorkspaces([], true);
+        setSelectedWsIds([]);
+      }
+      setConfirmDeleteModal(null);
+    } catch (err) {
+      console.error('Delete workspace error:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Settings state
   const [confidenceThreshold, setConfidenceThreshold] = useState(() => {
@@ -349,6 +394,60 @@ export default function WorkspaceHub({
             </div>
           </div>
 
+          {/* Multi-Select & Batch Deletion Bar */}
+          {workspaces.length > 0 && (
+            <div className="bg-[#161B22] border border-[#30363D] rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center space-x-3">
+                <label className="flex items-center space-x-2 cursor-pointer font-semibold text-slate-300 hover:text-white select-none">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={handleSelectAll}
+                    className="w-4 h-4 rounded text-emerald-500 bg-[#0D1117] border-[#30363D] focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span>Select All ({filteredWorkspaces.length})</span>
+                </label>
+
+                {selectedWsIds.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold font-mono text-[11px]">
+                    {selectedWsIds.length} selected
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2">
+                {selectedWsIds.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedWsIds([])}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-slate-300 font-medium transition"
+                    >
+                      Clear Selection
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteModal({ type: 'selected', count: selectedWsIds.length })}
+                      className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition flex items-center space-x-1.5 shadow-md shadow-rose-600/20"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Selected ({selectedWsIds.length})</span>
+                    </button>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteModal({ type: 'all', count: workspaces.length })}
+                  className="px-3 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-rose-300 hover:text-rose-100 font-semibold transition flex items-center space-x-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Delete All Workspaces</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Cards Grid (2 Columns, matching HF screenshot media_2) */}
           {filteredWorkspaces.length === 0 ? (
             <div className="p-12 text-center border border-dashed border-[#30363D] rounded-2xl bg-[#0D1117] space-y-3">
@@ -381,14 +480,41 @@ export default function WorkspaceHub({
                     {/* Top Gradient Banner with Space Info */}
                     <div className={`p-5 bg-gradient-to-r ${gradient} relative`}>
                       <div className="flex items-center justify-between text-xs text-white/90 pb-2">
-                        <span className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm text-[10px] font-bold text-emerald-300">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                          <span>Running</span>
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedWsIds.includes(ws.id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleSelectWs(ws.id);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 rounded text-emerald-500 bg-black/40 border-white/30 focus:ring-emerald-500 cursor-pointer"
+                            title="Select workspace"
+                          />
+                          <span className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm text-[10px] font-bold text-emerald-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                            <span>Running</span>
+                          </span>
+                        </div>
 
-                        <span className="text-white/60 group-hover:text-white transition">
-                          →
-                        </span>
+                        <div className="flex items-center space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setConfirmDeleteModal({ type: 'single', ws });
+                            }}
+                            className="p-1 rounded-md bg-black/40 hover:bg-rose-600 text-white/70 hover:text-white transition shadow-sm"
+                            title={`Delete ${ws.name}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="text-white/60 group-hover:text-white transition">
+                            →
+                          </span>
+                        </div>
                       </div>
 
                       <div className="space-y-1">
@@ -928,6 +1054,59 @@ export default function WorkspaceHub({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* DELETE WORKSPACE CONFIRMATION MODAL                                    */}
+      {/* ===================================================================== */}
+      {confirmDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#161B22] border border-[#30363D] rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl text-slate-200">
+            <div className="flex items-center space-x-3 text-rose-400">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                <AlertTriangle className="w-6 h-6 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">
+                  {confirmDeleteModal.type === 'single'
+                    ? `Delete Workspace "${confirmDeleteModal.ws?.name}"?`
+                    : confirmDeleteModal.type === 'selected'
+                    ? `Delete ${confirmDeleteModal.count} Selected Workspaces?`
+                    : `Delete All ${confirmDeleteModal.count} Workspaces?`}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  {confirmDeleteModal.type === 'all'
+                    ? 'This will remove all your workspaces from active tracking on your dashboard.'
+                    : 'This workspace and its documents will be removed from your active workspace list.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-3 border-t border-[#30363D]">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setConfirmDeleteModal(null)}
+                className="px-4 py-2 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-slate-300 font-semibold text-xs transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={executeDelete}
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition shadow-lg shadow-rose-600/20 flex items-center space-x-1.5"
+              >
+                {isDeleting ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>{isDeleting ? 'Deleting...' : 'Yes, Delete'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

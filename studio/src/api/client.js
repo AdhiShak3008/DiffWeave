@@ -152,6 +152,25 @@ export const api = {
     return res.json();
   },
 
+  async deleteWorkspace(workspaceId) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async batchDeleteWorkspaces(workspaceIds = [], deleteAll = false) {
+    const res = await fetch(`${API_BASE}/workspaces/batch-delete`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ workspace_ids: workspaceIds, delete_all: deleteAll }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async getWorkspaceStatus(workspaceId) {
     const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/status`, { headers: getHeaders() });
     return res.json();

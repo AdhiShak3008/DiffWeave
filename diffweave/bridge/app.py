@@ -60,6 +60,10 @@ class BatchReviewRequest(BaseModel):
     comments: Optional[str] = None
 
 
+class BatchDeleteWorkspacesRequest(BaseModel):
+    workspace_ids: Optional[list[str]] = None
+    delete_all: bool = False
+
 class CreateRuleRequest(BaseModel):
     name: str
     operator: str
@@ -412,6 +416,50 @@ async def create_workspace(req: CreateWorkspaceRequest, authorization: str = Hea
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+
+
+@app.delete("/api/workspaces/{workspace_id}")
+async def delete_workspace_endpoint(workspace_id: str, authorization: str = Header(None)):
+    try:
+        user = None
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.split(" ", 1)[1].strip()
+            user = docweave_auth.get_current_user_from_token(token)
+        user_id = user["id"] if user and user.get("id") else None
+        ok = db_store.delete_db_workspace(workspace_id, user_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail="Workspace not found or not authorized.")
+        return {"status": "DELETED", "workspace_id": workspace_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/workspaces/batch-delete")
+async def batch_delete_workspaces_endpoint(req: BatchDeleteWorkspacesRequest, authorization: str = Header(None)):
+    try:
+        user = None
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization.split(" ", 1)[1].strip()
+            user = docweave_auth.get_current_user_from_token(token)
+        user_id = user["id"] if user and user.get("id") else None
+
+        if req.delete_all:
+            if not user_id:
+                raise HTTPException(status_code=400, detail="Authentication required to delete all workspaces.")
+            count = db_store.delete_all_user_workspaces(user_id)
+            return {"status": "DELETED_ALL", "deleted_count": count}
+
+        if not req.workspace_ids:
+            raise HTTPException(status_code=400, detail="No workspace IDs provided.")
+
+        count = db_store.batch_delete_db_workspaces(req.workspace_ids, user_id)
+        return {"status": "DELETED_BATCH", "deleted_count": count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/workspaces/{workspace_id}/status")
 async def get_workspace_status(workspace_id: str):

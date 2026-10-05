@@ -237,6 +237,47 @@ export default function App() {
     }
   };
 
+  const handleDeleteWorkspace = async (wsId) => {
+    try {
+      // Optimistically remove from state
+      setWorkspaces((prev) => prev.filter((w) => w.id !== wsId));
+      if (currentWorkspace?.id === wsId) {
+        setCurrentWorkspace(null);
+        navigate('/');
+      }
+      showToast('Workspace deleted successfully.', 'info');
+      await api.deleteWorkspace(wsId);
+      refreshData();
+    } catch (err) {
+      showToast(`Delete failed: ${err.message}`, 'error');
+      refreshData();
+    }
+  };
+
+  const handleBatchDeleteWorkspaces = async (wsIds = [], deleteAll = false) => {
+    try {
+      if (deleteAll) {
+        setWorkspaces([]);
+        setCurrentWorkspace(null);
+        navigate('/');
+        showToast('All workspaces deleted.', 'info');
+      } else {
+        const idSet = new Set(wsIds);
+        setWorkspaces((prev) => prev.filter((w) => !idSet.has(w.id)));
+        if (currentWorkspace && idSet.has(currentWorkspace.id)) {
+          setCurrentWorkspace(null);
+          navigate('/');
+        }
+        showToast(`${wsIds.length} workspace(s) deleted.`, 'info');
+      }
+      await api.batchDeleteWorkspaces(wsIds, deleteAll);
+      refreshData();
+    } catch (err) {
+      showToast(`Batch delete failed: ${err.message}`, 'error');
+      refreshData();
+    }
+  };
+
   const handleSelectWorkspace = (ws) => {
     if (!ws) {
       setCurrentWorkspace(null);
@@ -426,6 +467,8 @@ export default function App() {
             currentWorkspace={currentWorkspace}
             onSelectWorkspace={handleSelectWorkspace}
             onCreateWorkspace={handleCreateWorkspace}
+            onDeleteWorkspace={handleDeleteWorkspace}
+            onBatchDeleteWorkspaces={handleBatchDeleteWorkspaces}
             currentUser={currentUser}
           />
         )}
@@ -478,8 +521,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* If workspace is empty or user is on quickstart tab, show GitHub-style CLI instructions */}
-            {(isWorkspaceEmpty || activeTab === 'quickstart') ? (
+            {/* Show GitHub-style CLI quickstart only when quickstart tab is selected */}
+            {activeTab === 'quickstart' ? (
               <WorkspaceEmptyState
                 workspace={currentWorkspace}
                 currentUser={currentUser}

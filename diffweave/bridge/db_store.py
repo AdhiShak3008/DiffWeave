@@ -391,3 +391,51 @@ def batch_review_db_proposals(workspace_id: str, decision: str, proposal_ids: Op
             )
 
     return {"status": new_status, "processed_count": count}
+
+
+def delete_db_workspace(workspace_id: str, user_id: Optional[str] = None) -> bool:
+    """Soft-delete a workspace by setting status = 'DELETED'."""
+    eng = get_engine()
+    with eng.begin() as conn:
+        if user_id:
+            res = conn.execute(
+                text("UPDATE workspaces SET status = 'DELETED', updated_at = NOW() WHERE id = :wid AND created_by = :uid"),
+                {"wid": workspace_id, "uid": user_id}
+            )
+        else:
+            res = conn.execute(
+                text("UPDATE workspaces SET status = 'DELETED', updated_at = NOW() WHERE id = :wid"),
+                {"wid": workspace_id}
+            )
+        return res.rowcount > 0
+
+
+def batch_delete_db_workspaces(workspace_ids: list[str], user_id: Optional[str] = None) -> int:
+    """Batch soft-delete workspaces by IDs."""
+    if not workspace_ids:
+        return 0
+    eng = get_engine()
+    with eng.begin() as conn:
+        pids = [str(wid) for wid in workspace_ids]
+        if user_id:
+            res = conn.execute(
+                text("UPDATE workspaces SET status = 'DELETED', updated_at = NOW() WHERE id::text = ANY(:wids) AND created_by = :uid"),
+                {"wids": pids, "uid": user_id}
+            )
+        else:
+            res = conn.execute(
+                text("UPDATE workspaces SET status = 'DELETED', updated_at = NOW() WHERE id::text = ANY(:wids)"),
+                {"wids": pids}
+            )
+        return res.rowcount
+
+
+def delete_all_user_workspaces(user_id: str) -> int:
+    """Soft-delete all active workspaces belonging to a user."""
+    eng = get_engine()
+    with eng.begin() as conn:
+        res = conn.execute(
+            text("UPDATE workspaces SET status = 'DELETED', updated_at = NOW() WHERE created_by = :uid AND (status != 'DELETED' OR status IS NULL)"),
+            {"uid": user_id}
+        )
+        return res.rowcount
