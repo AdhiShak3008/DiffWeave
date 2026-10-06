@@ -1,0 +1,24 @@
+COMMERCIAL CATERING SERVICE ORDER
+=======================================================
+Order ID: CATERING-2026-PO-882
+Vendor: Downtown Bistro & Gourmet Catering LLC
+Client: NovaTech Operations Team
+Delivery Date: May 5, 2026
+
+1. EVENT DETAILS
+- Event: Q2 Engineering Hackathon & Product Launch Luncheon.
+- Headcount: 85 attendees.
+- Delivery Location: 400 Innovation Way, Suite 300, Floor 4 Breakroom.
+
+2. MENU SELECTION
+- 40 Artisan Deli Sandwich platters (Smoked Turkey, Roast Beef, Vegetarian Hummus).
+- 25 Mediterranean grain salad bowls.
+- 10 Gallons fresh cold-brew coffee and iced matcha.
+- Assorted bakery cookies and gluten-free pastries.
+
+3. PRICING & PAYMENT
+- Subtotal: $1,450.00 USD
+- Delivery and setup fee: $120.00 USD
+- 18% Gratuity: $282.60 USD
+- Total Amount Due: $1,852.60 USD
+- Payment Method: Corporate Credit Card on delivery.

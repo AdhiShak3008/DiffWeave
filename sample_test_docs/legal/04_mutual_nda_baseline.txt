@@ -1,0 +1,24 @@
+MUTUAL NON-DISCLOSURE AGREEMENT (NDA)
+=======================================================
+Agreement ID: NDA-2026-MUTUAL-01
+Parties: NovaTech Solutions Inc. and Apex Retail Corp.
+Effective Date: January 15, 2026
+Term: 2 Years from Effective Date
+
+1. CONFIDENTIAL INFORMATION
+Confidential Information includes all proprietary software architectures, source code, trade secrets, customer financial records, and commercial negotiations disclosed by either party.
+
+2. NON-DISCLOSURE OBLIGATIONS
+Each Receiving Party agrees:
+- To protect Confidential Information with the same degree of care as its own proprietary assets (minimum reasonable care).
+- To restrict access solely to employees and certified legal advisors with a strict need-to-know.
+- Not to disclose or reverse engineer any proprietary materials without prior written consent.
+
+3. EXCLUSIONS FROM CONFIDENTIALITY
+Information is excluded if it is:
+- Already known to the recipient prior to disclosure.
+- Lawfully obtained from an independent third party without confidentiality breach.
+- Required to be disclosed by valid subpoena or court order with immediate notice to Disclosing Party.
+
+4. RETURN OR DESTRUCTION
+Upon written request, all copies of Confidential Information must be permanently destroyed or returned within 10 calendar days.

@@ -1,0 +1,26 @@
+MASTER SERVICES AGREEMENT (MSA)
+=======================================================
+Agreement ID: MSA-2026-CLOUD-01
+Parties: NovaTech Solutions Inc. ("Provider") and Apex Retail Corp. ("Customer")
+Effective Date: March 1, 2026
+Initial Term: 12 Months
+
+1. SCOPE OF SERVICES
+Provider will deliver managed cloud infrastructure and real-time inventory synchronization software to Customer.
+
+2. FEES AND PAYMENT TERMS
+- Monthly Subscription Fee: $5,000 USD billed at the start of each month.
+- Payment Terms: Net 30 days from invoice date. Late payments incur a 1.5% monthly interest fee.
+
+3. SERVICE LEVEL AGREEMENT (SLA)
+- Monthly Uptime Guarantee: 99.5% service availability across standard operating hours.
+- Maintenance Window: Planned maintenance scheduled exclusively on Sundays between 02:00 and 04:00 UTC.
+- Service Credits: Customer receives a 5% billing credit for each full 1% drop below the monthly uptime target.
+
+4. LIMITATION OF LIABILITY
+- Aggregate Liability Cap: Strictly capped at 1x the total annual fees paid under this Agreement ($60,000 USD).
+- Consequential Damages: Neither party shall be liable for indirect, incidental, or lost-profit damages.
+
+5. TERMINATION AND NOTICE
+- Termination for Convenience: Either party may terminate with 30 days prior written notice.
+- Governing Law: State of Delaware, United States.

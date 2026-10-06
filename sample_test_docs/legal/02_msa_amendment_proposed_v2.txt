@@ -1,0 +1,25 @@
+AMENDMENT NO. 1 TO MASTER SERVICES AGREEMENT
+=======================================================
+Amendment ID: AMD-2026-CLOUD-01A
+Reference Agreement: MSA-2026-CLOUD-01
+Effective Date: April 15, 2026
+Parties: NovaTech Solutions Inc. and Apex Retail Corp.
+
+WHEREAS, the Parties agree to amend specific operational and commercial terms of the Master Services Agreement as follows:
+
+1. REVISED SUBSCRIPTION FEES
+- Section 2 is amended: Monthly Subscription Fee is reduced to $4,200 USD in consideration of a 24-month commitment.
+- Payment Terms remain Net 30 days from invoice date.
+
+2. ENHANCED SLA COMMITMENT
+- Section 3 is amended: Monthly Uptime Guarantee is increased from 99.5% to 99.9% 24/7 availability.
+- Service Credits are increased to 10% credit for any month falling below the 99.9% threshold.
+
+3. EXPANDED LIABILITY CAP
+- Section 4 is amended: Aggregate Liability Cap is increased from $60,000 USD to 2x annual contract value ($100,800 USD).
+
+4. EXTENDED TERMINATION NOTICE
+- Section 5 is amended: Termination for convenience now requires 60 days prior written notice (previously 30 days).
+
+5. DATA PRIVACY AND SECURITY ADDENDUM
+- Provider shall undergo an annual SOC 2 Type II audit and report critical security incidents within 24 hours of discovery.

@@ -1,0 +1,21 @@
+CUSTOMER COUNTER-PROPOSAL: PROCUREMENT REVISION
+=======================================================
+Document ID: CP-2026-APEX-01
+Reference Agreement: MSA-2026-CLOUD-01
+Submitted By: Apex Retail Procurement & Legal Department
+Date: April 20, 2026
+
+The Customer proposes the following modifications to the Cloud Services Agreement:
+
+1. MODIFIED PAYMENT TERMS
+- Payment Terms: Net 60 days from invoice receipt (Customer rejects Net 30 days).
+
+2. UNLIMITED LIABILITY CLAUSE (HIGH RISK)
+- Section 4 modification: Provider agrees to uncapped, unlimited liability for any data security breach, IP infringement, or system downtime affecting Customer retail stores.
+
+3. STRICT TERMINATION RIGHT
+- Customer reserves the unilateral right to terminate immediately without cause upon 5 business days notice.
+- No termination fee or early cancellation penalty shall apply.
+
+4. SEVERE PENALTY ESCALATION
+- In the event monthly uptime falls below 99.0%, Customer shall withhold 50% of the quarterly contract payout.
