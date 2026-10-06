@@ -205,7 +205,15 @@ export default function WorkspaceHub({
       alert(`A workspace named "${finalName}" already exists. Workspace names must be unique.`);
       return;
     }
-    await onCreateWorkspace(finalName, wsDesc.trim());
+    const templateDescriptions = {
+      clinical: 'Hospital clinical guidelines, diagnostic criteria, standard of care protocols & dosing safety thresholds.',
+      trials: 'Clinical trial endpoints, RECIST criteria, SAE adverse event reporting & participant inclusion protocols.',
+      pharma: 'Pharmaceutical IND/CMC documentation, drug release specifications & pharmacovigilance audit trails.',
+      legal: 'Enterprise legal agreements, vendor contracts, NDA obligations & regulatory compliance covenants.',
+      engineering: 'Engineering system architecture RFCs, microservice contracts & cloud security baselines.',
+    };
+    const finalDesc = wsDesc.trim() || templateDescriptions[starterTemplate] || 'DiffWeave verified knowledge repository.';
+    await onCreateWorkspace(finalName, finalDesc, starterTemplate);
     setWsName('');
     setWsDesc('');
     setShowCreateModal(false);
@@ -997,43 +1005,87 @@ export default function WorkspaceHub({
 
                 {/* Starter Template */}
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-300">Starter template</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-300">Starter template</label>
+                    <span className="text-[10px] text-slate-500 font-mono">6 Specialized Templates</span>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <button
                       type="button"
                       onClick={() => setStarterTemplate('empty')}
                       className={`p-2.5 rounded-lg border text-left transition ${
                         starterTemplate === 'empty'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
                           : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
                       }`}
                     >
-                      <span className="font-bold block">Empty Workspace</span>
-                      <span className="text-[10px] text-slate-500">Blank slate, ingest docs via CLI or dropzone</span>
+                      <span className="font-bold block text-slate-200">Empty Workspace</span>
+                      <span className="text-[10px] text-slate-400 block pt-0.5">Blank slate, ingest docs via CLI or dropzone</span>
                     </button>
+
                     <button
                       type="button"
-                      onClick={() => setStarterTemplate('cardiology')}
+                      onClick={() => setStarterTemplate('clinical')}
                       className={`p-2.5 rounded-lg border text-left transition ${
-                        starterTemplate === 'cardiology'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                        starterTemplate === 'clinical'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
                           : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
                       }`}
                     >
-                      <span className="font-bold block">Clinical Cardiology</span>
-                      <span className="text-[10px] text-slate-500">Pre-loaded guidelines & 85% confidence rule</span>
+                      <span className="font-bold block text-emerald-400">General Clinical Protocols</span>
+                      <span className="text-[10px] text-slate-400 block pt-0.5">Hospital guidelines, diagnostic criteria & dosing thresholds</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setStarterTemplate('trials')}
+                      className={`p-2.5 rounded-lg border text-left transition ${
+                        starterTemplate === 'trials'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
+                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-bold block text-blue-400">Clinical Trials & Oncology</span>
+                      <span className="text-[10px] text-slate-400 block pt-0.5">Trial endpoints, RECIST criteria & SAE adverse event reporting</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setStarterTemplate('pharma')}
+                      className={`p-2.5 rounded-lg border text-left transition ${
+                        starterTemplate === 'pharma'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
+                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-bold block text-violet-400">Pharma & Drug Regulatory</span>
+                      <span className="text-[10px] text-slate-400 block pt-0.5">Pharmacovigilance, IND/CMC specs & regulatory submissions</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => setStarterTemplate('legal')}
                       className={`p-2.5 rounded-lg border text-left transition ${
                         starterTemplate === 'legal'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
                           : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
                       }`}
                     >
-                      <span className="font-bold block">Legal Agreements</span>
-                      <span className="text-[10px] text-slate-500">NDAs, clause extraction & policy CI rules</span>
+                      <span className="font-bold block text-amber-400">Legal Agreements</span>
+                      <span className="text-[10px] text-slate-400 block pt-0.5">NDAs, vendor contracts, clause extraction & policy CI rules</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setStarterTemplate('engineering')}
+                      className={`p-2.5 rounded-lg border text-left transition ${
+                        starterTemplate === 'engineering'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
+                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <span className="font-bold block text-cyan-400">Engineering & DevOps RFCs</span>
+                      <span className="text-[10px] text-slate-400 block pt-0.5">System architecture RFCs, security baselines & API contracts</span>
                     </button>
                   </div>
                 </div>

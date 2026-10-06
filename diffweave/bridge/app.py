@@ -49,6 +49,14 @@ class CreateWorkspaceRequest(BaseModel):
     description: Optional[str] = ""
 
 
+class CreateProposalRequest(BaseModel):
+    summary: str
+    rationale: Optional[str] = "Revision proposal submitted from Truth Register"
+    proposal_type: str = "UPDATE"
+    knowledge_item_id: Optional[str] = None
+    proposed_changes: dict[str, Any]
+
+
 class ReviewProposalRequest(BaseModel):
     decision: str  # APPROVED, REJECTED, ARCHIVED
     comments: Optional[str] = None
@@ -552,6 +560,24 @@ async def get_proposals(
         return props
     except Exception:
         return db_store.get_db_proposals(workspace_id)
+
+
+@app.post("/api/workspaces/{workspace_id}/proposals")
+async def create_proposal_endpoint(
+    workspace_id: str,
+    req: CreateProposalRequest,
+):
+    try:
+        return db_store.create_db_proposal(
+            workspace_id=workspace_id,
+            proposal_type=req.proposal_type,
+            summary=req.summary,
+            rationale=req.rationale,
+            proposed_changes=req.proposed_changes,
+            knowledge_item_id=req.knowledge_item_id,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/api/workspaces/{workspace_id}/proposals/{proposal_id}/review")

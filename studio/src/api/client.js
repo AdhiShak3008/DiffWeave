@@ -211,6 +211,16 @@ export const api = {
     return res.json();
   },
 
+  async createProposal(workspaceId, payload) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/proposals`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async reviewProposal(workspaceId, proposalId, decision, comments = '') {
     const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/proposals/${proposalId}/review`, {
       method: 'POST',

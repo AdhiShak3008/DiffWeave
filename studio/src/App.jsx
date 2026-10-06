@@ -559,7 +559,7 @@ export default function App() {
 
                 {/* TAB 3: Knowledge Graph DAG Canvas */}
                 {activeTab === 'graph' && (
-                  <KnowledgeGraph graphData={graphData} loading={loading} />
+                  <KnowledgeGraph graphData={graphData} loading={loading} onSelectTab={handleTabChange} />
                 )}
 
                 {/* TAB 4: Documents & Ingestion Staging */}
@@ -597,6 +597,7 @@ export default function App() {
                     setActiveTab={handleTabChange}
                     pendingProposalsCount={(proposals || []).filter((p) => !p.status || p.status.toUpperCase() === 'PENDING').length}
                     onApproveAll={() => handleBatchReview('APPROVED')}
+                    onRefresh={refreshData}
                   />
                 )}
 

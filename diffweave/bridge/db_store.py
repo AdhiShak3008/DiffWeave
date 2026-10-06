@@ -651,3 +651,42 @@ def search_db_knowledge(workspace_id: str, query: str, limit: int = 20) -> list[
     except Exception as e:
         logger.warning(f"Error searching DB knowledge: {e}")
         return []
+
+
+def create_db_proposal(
+    workspace_id: str,
+    proposal_type: str,
+    summary: str,
+    rationale: str,
+    proposed_changes: dict[str, Any],
+    knowledge_item_id: Optional[str] = None
+) -> dict[str, Any]:
+    """Create a new proposal (e.g. revision or new assertion) in PostgreSQL."""
+    import uuid
+    import json
+    pid = str(uuid.uuid4())
+    eng = get_engine()
+    with eng.begin() as conn:
+        conn.execute(
+            text("""
+                INSERT INTO proposals (id, workspace_id, knowledge_item_id, proposal_type, status, created_at, proposed_changes, summary, rationale)
+                VALUES (:pid, :ws, :kid, :pt, 'PENDING', NOW(), :pc, :sum, :rat)
+            """),
+            {
+                "pid": pid,
+                "ws": workspace_id,
+                "kid": str(knowledge_item_id) if knowledge_item_id else None,
+                "pt": proposal_type.upper(),
+                "pc": json.dumps(proposed_changes),
+                "sum": summary,
+                "rat": rationale,
+            }
+        )
+    return {
+        "id": pid,
+        "workspace_id": workspace_id,
+        "proposal_type": proposal_type.upper(),
+        "status": "PENDING",
+        "summary": summary,
+        "knowledge_item_id": knowledge_item_id,
+    }
