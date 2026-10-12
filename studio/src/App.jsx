@@ -13,6 +13,7 @@ import KnowledgeBase from './components/KnowledgeBase';
 import PolicyRulesLab from './components/PolicyRulesLab';
 import AuditLog from './components/AuditLog';
 import AccessManagementModal from './components/AccessManagementModal';
+import CreateWorkspacePage from './components/CreateWorkspacePage';
 import { RefreshCw, CheckCircle2, AlertCircle, Sparkles, GitBranch, ArrowLeft } from 'lucide-react';
 
 export default function App() {
@@ -65,15 +66,20 @@ export default function App() {
 
   // Parse deep URL parameters for native browser Back/Forward & direct opening
   const pathname = location.pathname;
+  const isNewWorkspacePage = pathname === '/new' || pathname === '/workspaces/new';
   const pathParts = pathname.split('/').filter(Boolean);
-  const isWsPath = pathParts[0] === 'workspaces';
+  const isWsPath = pathParts[0] === 'workspaces' && pathParts[1] !== 'new';
   const urlWsId = isWsPath ? pathParts[1] : null;
   const urlTab = isWsPath ? (pathParts[2] || 'diff') : 'diff';
   const urlProposalId = (isWsPath && pathParts[2] === 'prs') ? pathParts[3] : null;
 
   // Synchronize state whenever URL or workspaces change
   useEffect(() => {
-    if (urlWsId) {
+    if (isNewWorkspacePage) {
+      if (currentWorkspace !== null) {
+        setCurrentWorkspace(null);
+      }
+    } else if (urlWsId) {
       const match = workspaces.find((w) => w.id === urlWsId);
       if (match) {
         if (!currentWorkspace || currentWorkspace.id !== match.id) {
@@ -94,7 +100,7 @@ export default function App() {
         setCurrentWorkspace(null);
       }
     }
-  }, [pathname, urlWsId, urlTab, workspaces]);
+  }, [pathname, isNewWorkspacePage, urlWsId, urlTab, workspaces]);
 
   // Update currentWorkspace reference if workspaces list gets fresh counts
   useEffect(() => {
@@ -234,10 +240,13 @@ export default function App() {
       };
       setWorkspaces((prev) => [wsItem, ...prev]);
       setCurrentWorkspace(wsItem);
-      showToast(`Workspace "${cleanName}" created! Follow CLI instructions to populate.`);
-      navigate(`/workspaces/${wsItem.id}/quickstart`);
+      showToast(`Workspace "${cleanName}" created successfully!`);
+      // Direct immediately into the newly created workspace
+      navigate(`/workspaces/${wsItem.id}/diff`);
+      return wsItem;
     } catch (err) {
       showToast(`Create failed: ${err.message}`, 'error');
+      throw err;
     }
   };
 
@@ -464,9 +473,20 @@ export default function App() {
       {/* Main Content Area */}
       <main className="flex-1 w-full">
         {/* =================================================================== */}
-        {/* VIEW 1: Hugging Face Style Workspaces Hub (When no ws is selected) */}
+        {/* VIEW 0: Dedicated Create Workspace Page (/new or /workspaces/new)  */}
         {/* =================================================================== */}
-        {!currentWorkspace && (
+        {isNewWorkspacePage && (
+          <CreateWorkspacePage
+            onCreateWorkspace={handleCreateWorkspace}
+            workspaces={workspaces}
+            currentUser={currentUser}
+          />
+        )}
+
+        {/* =================================================================== */}
+        {/* VIEW 1: Workspaces Hub (When no ws is selected and not creating)   */}
+        {/* =================================================================== */}
+        {!isNewWorkspacePage && !currentWorkspace && (
           <WorkspaceHub
             workspaces={workspaces}
             currentWorkspace={currentWorkspace}

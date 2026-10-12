@@ -225,16 +225,14 @@ export default function Navbar({
                 </div>
 
                 <div className="pt-1.5 border-t border-[#30363D]">
-                  <button
-                    onClick={() => {
-                      setShowWsDropdown(false);
-                      setShowCreateModal(true);
-                    }}
-                    className="w-full text-left px-2 py-1.5 rounded text-xs text-sky-400 hover:bg-[#21262D] font-semibold flex items-center space-x-1.5"
+                  <Link
+                    to="/new"
+                    onClick={() => setShowWsDropdown(false)}
+                    className="w-full text-left px-2 py-1.5 rounded text-xs text-emerald-400 hover:bg-[#21262D] font-semibold flex items-center space-x-1.5 no-underline"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>New Document Workspace...</span>
-                  </button>
+                  </Link>
                 </div>
               </div>
             )}
@@ -470,43 +468,7 @@ export default function Navbar({
         </>
       )}
 
-      {/* Fallback Simple Modal if triggered from dropdown */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161B22] border border-[#30363D] rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <h3 className="text-base font-bold text-white">Create New Document Workspace</h3>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-300">Workspace Identifier</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. security-policies-2026"
-                  value={newWsName}
-                  onChange={(e) => setNewWsName(e.target.value)}
-                  className="w-full mt-1 px-3 py-2 rounded-lg bg-[#0D1117] border border-[#30363D] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
 
-              <div className="flex justify-end space-x-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-3 py-1.5 rounded-lg bg-[#21262D] hover:bg-[#30363D] text-slate-300 text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white text-xs font-bold"
-                >
-                  Initialize Workspace
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </header>
   );
 }

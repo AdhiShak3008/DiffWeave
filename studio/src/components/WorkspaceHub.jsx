@@ -104,33 +104,6 @@ export default function WorkspaceHub({
   const [copiedKey, setCopiedKey] = useState(false);
   const [showKeyRaw, setShowKeyRaw] = useState(false);
 
-  // GitHub-style Create Workspace form state
-  const [wsName, setWsName] = useState('');
-  const [wsDesc, setWsDesc] = useState('');
-  const [wsVisibility, setWsVisibility] = useState('private');
-  const [starterTemplate, setStarterTemplate] = useState('title-insurance');
-  const [selectedParent, setSelectedParent] = useState('legal_title');
-  const [suggestedName] = useState(() => {
-    const suggestions = ['fuzzy-spork', 'neural-policy-v2', 'clinical-guidelines', 'rag-truth-matrix', 'legal-audit-2026'];
-    return suggestions[Math.floor(Math.random() * suggestions.length)];
-  });
-
-  const handleSelectChildTemplate = (tmplId) => {
-    setStarterTemplate(tmplId);
-    const tmpl = TEMPLATES_CATALOG[tmplId];
-    if (tmpl) {
-      if (tmpl.defaultVisibility) {
-        setWsVisibility(tmpl.defaultVisibility);
-      }
-      if (!wsName.trim() && tmpl.suggestedSlug) {
-        setWsName(tmpl.suggestedSlug);
-      }
-      if (!wsDesc.trim() && tmpl.description) {
-        setWsDesc(tmpl.description);
-      }
-    }
-  };
-
   const username = currentUser?.username || 'developer';
   const displayName = currentUser?.username || 'developer';
   const email = currentUser?.email || 'developer@diffweave.io';
@@ -224,23 +197,6 @@ export default function WorkspaceHub({
     }
   };
 
-  const handleCreateSubmit = async (e) => {
-    e.preventDefault();
-    const finalName = (wsName.trim() || suggestedName).trim();
-    const isDuplicate = (workspaces || []).some(
-      (w) => w.name && w.name.trim().toLowerCase() === finalName.toLowerCase()
-    );
-    if (isDuplicate) {
-      alert(`A workspace named "${finalName}" already exists. Workspace names must be unique.`);
-      return;
-    }
-    const currentTmpl = TEMPLATES_CATALOG[starterTemplate] || TEMPLATES_CATALOG['empty'];
-    const finalDesc = wsDesc.trim() || currentTmpl.description || 'DiffWeave verified knowledge repository.';
-    await onCreateWorkspace(finalName, finalDesc, starterTemplate, wsVisibility);
-    setWsName('');
-    setWsDesc('');
-    setShowCreateModal(false);
-  };
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -258,22 +214,18 @@ export default function WorkspaceHub({
         {/* ================================================================= */}
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-[#0D1117] border border-[#30363D] rounded-2xl p-5 shadow-xl space-y-5">
-            {/* Avatar with Pink / Neon Green ring accent */}
-            <div className="relative w-28 h-28 mx-auto mt-2">
-              <div className="w-28 h-28 rounded-full bg-gradient-to-tr from-pink-500 via-rose-400 to-emerald-400 p-[3px] shadow-lg shadow-pink-500/20">
+            {/* Sleek Professional Developer Avatar */}
+            <div className="relative w-24 h-24 mx-auto mt-2">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-500/80 via-teal-400/60 to-cyan-500/80 p-[2.5px] shadow-lg shadow-emerald-500/20">
                 <div className="w-full h-full rounded-full bg-[#161B22] flex items-center justify-center overflow-hidden">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-pink-400 to-rose-600 flex items-center justify-center text-white text-3xl font-black shadow-inner">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#1E293B] to-[#0F172A] border border-slate-700/60 flex items-center justify-center text-emerald-400 text-2xl font-black shadow-inner">
                     {username[0]?.toUpperCase() || 'A'}
                   </div>
                 </div>
               </div>
-              {/* Green star badge */}
-              <div className="absolute top-0 left-0 w-6 h-6 rounded-full bg-emerald-400 text-black flex items-center justify-center text-xs font-bold shadow-md">
-                ✦
-              </div>
-              {/* Hand wave badge */}
-              <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-[#161B22] border border-[#30363D] flex items-center justify-center text-xs shadow-md">
-                👋
+              {/* Verified member badge */}
+              <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-emerald-500 text-black flex items-center justify-center text-xs font-bold shadow-md" title="Verified Member">
+                ✓
               </div>
             </div>
 
@@ -281,7 +233,7 @@ export default function WorkspaceHub({
             <div className="text-center space-y-1">
               <div className="flex items-center justify-center space-x-2">
                 <h2 className="text-lg font-extrabold text-white">{displayName}</h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-emerald-500 to-teal-400 text-black uppercase tracking-wider shadow-sm">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider shadow-sm font-mono">
                   PRO
                 </span>
               </div>
@@ -290,13 +242,13 @@ export default function WorkspaceHub({
 
             {/* Profile Action Buttons */}
             <div className="grid grid-cols-3 gap-2 pt-1">
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="col-span-1 flex items-center justify-center space-x-1 py-1.5 px-2 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white text-xs font-bold transition shadow-sm"
+              <Link
+                to="/new"
+                className="col-span-1 flex items-center justify-center space-x-1 py-1.5 px-2 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white text-xs font-bold transition shadow-sm no-underline"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New</span>
-              </button>
+              </Link>
               <button
                 onClick={() => setShowProfileModal(true)}
                 className="col-span-1 py-1.5 px-2 rounded-lg bg-[#161B22] hover:bg-[#21262D] border border-[#30363D] text-slate-300 hover:text-white text-xs font-semibold transition text-center truncate"
@@ -418,13 +370,13 @@ export default function WorkspaceHub({
                 </select>
               </div>
 
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-bold text-xs shadow-md transition"
+              <Link
+                to="/new"
+                className="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white font-bold text-xs shadow-md transition no-underline"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>New Workspace</span>
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -482,7 +434,7 @@ export default function WorkspaceHub({
             </div>
           )}
 
-          {/* Cards Grid (2 Columns, matching HF screenshot media_2) */}
+          {/* Cards Grid */}
           {filteredWorkspaces.length === 0 ? (
             <div className="p-12 text-center border border-dashed border-[#30363D] rounded-2xl bg-[#0D1117] space-y-3">
               <Layers className="w-10 h-10 text-slate-500 mx-auto" />
@@ -490,13 +442,13 @@ export default function WorkspaceHub({
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
                 No workspaces match your query. Try a different search term or create a new workspace.
               </p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white text-xs font-bold transition inline-flex items-center space-x-1.5"
+              <Link
+                to="/new"
+                className="px-4 py-2 rounded-lg bg-[#238636] hover:bg-[#2EA043] text-white text-xs font-bold transition inline-flex items-center space-x-1.5 no-underline"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Create Workspace</span>
-              </button>
+              </Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -862,10 +814,8 @@ export default function WorkspaceHub({
         </div>
       )}
 
-      {/* ===================================================================== */}
-      {/* GITHUB-STYLE "CREATE A NEW REPOSITORY / WORKSPACE" MODAL (media_1)   */}
-      {/* ===================================================================== */}
-      {showCreateModal && (
+      {/* CREATE WORKSPACE MODAL DEPRECATED (MOVED TO /new PAGE) */}
+      {false && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-[#0D1117] border border-[#30363D] rounded-2xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl text-slate-200">
             {/* Modal Header */}
