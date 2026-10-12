@@ -1,4 +1,4 @@
-﻿"""
+"""
 FastAPI Server Bridge for DiffWeave Studio.
 
 Provides secure, authenticated, workspace-scoped REST APIs that
@@ -47,6 +47,21 @@ client = DiffWeaveMCPClient()
 class CreateWorkspaceRequest(BaseModel):
     name: str
     description: Optional[str] = ""
+    template: Optional[str] = "empty"
+    visibility: Optional[str] = "private"
+
+
+class UpdateVisibilityRequest(BaseModel):
+    visibility: str
+
+
+class AddMemberRequest(BaseModel):
+    email: str
+    role: str = "EDITOR"
+
+
+class UpdateMemberRoleRequest(BaseModel):
+    role: str
 
 
 class CreateProposalRequest(BaseModel):
@@ -303,7 +318,7 @@ async def get_workspaces(authorization: str = Header(None)):
             if user and user.get("id") and user.get("role") != "evaluator":
                 rows = conn.execute(
                     text("""
-                        SELECT w.id, w.name, w.description,
+                        SELECT w.id, w.name, w.description, w.visibility, w.template,
                                (SELECT count(*) FROM knowledge_items WHERE workspace_id = w.id) as k_count,
                                (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
                         FROM workspaces w
@@ -317,9 +332,11 @@ async def get_workspaces(authorization: str = Header(None)):
                     {
                         "id": str(r[0]),
                         "name": r[1],
-                        "description": r[2] or f"{r[4]} documents · {r[3]} verified facts",
-                        "k_count": r[3],
-                        "d_count": r[4]
+                        "description": r[2] or f"{r[6]} documents · {r[5]} verified facts",
+                        "visibility": r[3] or "private",
+                        "template": r[4] or "empty",
+                        "k_count": r[5],
+                        "d_count": r[6]
                     }
                     for r in rows
                 ]
@@ -327,7 +344,7 @@ async def get_workspaces(authorization: str = Header(None)):
             # If evaluator/demo or no user, return active workspaces (excluding deleted)
             rows = conn.execute(
                 text("""
-                    SELECT w.id, w.name, w.description,
+                    SELECT w.id, w.name, w.description, w.visibility, w.template,
                            (SELECT count(*) FROM knowledge_items WHERE workspace_id = w.id) as k_count,
                            (SELECT count(*) FROM documents WHERE workspace_id = w.id) as d_count
                     FROM workspaces w
@@ -339,9 +356,11 @@ async def get_workspaces(authorization: str = Header(None)):
                 {
                     "id": str(r[0]),
                     "name": r[1],
-                    "description": r[2] or f"{r[4]} documents · {r[3]} verified facts",
-                    "k_count": r[3],
-                    "d_count": r[4]
+                    "description": r[2] or f"{r[6]} documents · {r[5]} verified facts",
+                    "visibility": r[3] or "private",
+                    "template": r[4] or "empty",
+                    "k_count": r[5],
+                    "d_count": r[6]
                 }
                 for r in rows
             ]
@@ -395,24 +414,42 @@ async def create_workspace(req: CreateWorkspaceRequest, authorization: str = Hea
                     detail=f"A workspace named '{clean_name}' already exists. Workspace names must be unique."
                 )
 
-        # Create new workspace directly in DB with authenticated ownership
+        # Create new workspace directly in DB with authenticated ownership, template, and visibility
         ws_id = str(uuid.uuid4())
         if user_id == "00000000-0000-0000-0000-000000000001":
             docweave_auth.ensure_evaluator_user()
         owner_id = user_id or "59a0fed0-17c7-4013-82fc-985f5d1ee623"
+        template_id = (req.template or "empty").lower().strip()
+        visibility = (req.visibility or "private").lower().strip()
+
         with eng.begin() as conn:
             conn.execute(
                 text("""
-                    INSERT INTO workspaces (id, name, description, created_by, status, created_at, updated_at)
-                    VALUES (:id, :name, :desc, :uid, 'ACTIVE', NOW(), NOW())
+                    INSERT INTO workspaces (id, name, description, created_by, status, created_at, updated_at, visibility, template)
+                    VALUES (:id, :name, :desc, :uid, 'ACTIVE', NOW(), NOW(), :vis, :tmpl)
                 """),
-                {"id": ws_id, "name": clean_name, "desc": req.description or "", "uid": owner_id}
+                {
+                    "id": ws_id,
+                    "name": clean_name,
+                    "desc": req.description or "",
+                    "uid": owner_id,
+                    "vis": visibility,
+                    "tmpl": template_id
+                }
             )
+
+        # Automatically seed specialized template policy rules
+        try:
+            db_store.seed_workspace_template_rules(ws_id, template_id)
+        except Exception as seed_err:
+            logger.warning(f"Could not auto-seed template rules for workspace {ws_id}: {seed_err}")
 
         return {
             "id": ws_id,
             "name": clean_name,
             "description": req.description or "",
+            "visibility": visibility,
+            "template": template_id,
             "status": "ACTIVE",
             "created_by": owner_id,
             "d_count": 0,
@@ -422,6 +459,177 @@ async def create_workspace(req: CreateWorkspaceRequest, authorization: str = Hea
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Workspace Access & Collaborator Management
+# ---------------------------------------------------------------------------
+
+@app.get("/api/workspaces/{workspace_id}/access")
+async def get_workspace_access_endpoint(workspace_id: str, authorization: str = Header(None)):
+    try:
+        eng = docweave_auth.get_engine()
+        with eng.connect() as conn:
+            ws = conn.execute(
+                text("SELECT id, name, created_by, visibility, template FROM workspaces WHERE id::text = :ws"),
+                {"ws": workspace_id}
+            ).first()
+            if not ws:
+                raise HTTPException(status_code=404, detail="Workspace not found.")
+
+            owner_id = str(ws[2]) if ws[2] else ""
+            owner_user = None
+            if owner_id:
+                u = conn.execute(
+                    text("SELECT id, username, email FROM users WHERE id::text = :uid"),
+                    {"uid": owner_id}
+                ).first()
+                if u:
+                    owner_user = {"id": str(u[0]), "username": u[1], "email": u[2]}
+
+            members_rows = conn.execute(
+                text("""
+                    SELECT id, user_id, email, role, created_at
+                    FROM workspace_members
+                    WHERE workspace_id::text = :ws
+                    ORDER BY created_at ASC
+                """),
+                {"ws": workspace_id}
+            ).fetchall()
+
+            members = [
+                {
+                    "id": str(m[0]),
+                    "user_id": str(m[1]) if m[1] else None,
+                    "email": m[2],
+                    "role": m[3] or "VIEWER",
+                    "created_at": m[4].isoformat() if m[4] else ""
+                }
+                for m in members_rows
+            ]
+
+            return {
+                "workspace_id": workspace_id,
+                "name": ws[1],
+                "visibility": ws[3] or "private",
+                "template": ws[4] or "empty",
+                "owner": owner_user or {"id": owner_id, "username": "Workspace Owner", "email": "evaluator@docweave.io"},
+                "members": members,
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/workspaces/{workspace_id}/access/visibility")
+async def update_workspace_visibility_endpoint(
+    workspace_id: str,
+    req: UpdateVisibilityRequest,
+    authorization: str = Header(None)
+):
+    vis = req.visibility.lower().strip()
+    if vis not in ["public", "private"]:
+        raise HTTPException(status_code=400, detail="Visibility must be 'public' or 'private'.")
+    try:
+        eng = docweave_auth.get_engine()
+        with eng.begin() as conn:
+            conn.execute(
+                text("UPDATE workspaces SET visibility = :vis, updated_at = NOW() WHERE id::text = :ws"),
+                {"vis": vis, "ws": workspace_id}
+            )
+        return {"workspace_id": workspace_id, "visibility": vis, "message": f"Visibility updated to {vis}."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/workspaces/{workspace_id}/access/members")
+async def add_workspace_member_endpoint(
+    workspace_id: str,
+    req: AddMemberRequest,
+    authorization: str = Header(None)
+):
+    clean_email = req.email.strip().lower()
+    if not clean_email or "@" not in clean_email:
+        raise HTTPException(status_code=400, detail="Valid email address is required.")
+    role = req.role.upper().strip()
+    if role not in ["ADMIN", "EDITOR", "VIEWER"]:
+        role = "EDITOR"
+    try:
+        import uuid
+        eng = docweave_auth.get_engine()
+        with eng.begin() as conn:
+            user_row = conn.execute(
+                text("SELECT id FROM users WHERE LOWER(email) = :e"),
+                {"e": clean_email}
+            ).first()
+            user_id = user_row[0] if user_row else None
+
+            existing = conn.execute(
+                text("SELECT id FROM workspace_members WHERE workspace_id::text = :ws AND LOWER(email) = :e"),
+                {"ws": workspace_id, "e": clean_email}
+            ).first()
+            if existing:
+                conn.execute(
+                    text("UPDATE workspace_members SET role = :r WHERE id = :mid"),
+                    {"r": role, "mid": existing[0]}
+                )
+                member_id = str(existing[0])
+            else:
+                member_id = str(uuid.uuid4())
+                conn.execute(
+                    text("""
+                        INSERT INTO workspace_members (id, workspace_id, user_id, email, role, created_at)
+                        VALUES (:id, :ws, :uid, :e, :r, NOW())
+                    """),
+                    {"id": member_id, "ws": workspace_id, "uid": user_id, "e": clean_email, "r": role}
+                )
+
+        return {
+            "id": member_id,
+            "workspace_id": workspace_id,
+            "email": clean_email,
+            "role": role,
+            "message": f"Collaborator {clean_email} added with role {role}."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/workspaces/{workspace_id}/access/members/{member_id}")
+async def remove_workspace_member_endpoint(workspace_id: str, member_id: str, authorization: str = Header(None)):
+    try:
+        eng = docweave_auth.get_engine()
+        with eng.begin() as conn:
+            conn.execute(
+                text("DELETE FROM workspace_members WHERE workspace_id::text = :ws AND id::text = :mid"),
+                {"ws": workspace_id, "mid": member_id}
+            )
+        return {"status": "ok", "message": "Collaborator removed."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/api/workspaces/{workspace_id}/access/members/{member_id}")
+async def update_workspace_member_role_endpoint(
+    workspace_id: str,
+    member_id: str,
+    req: UpdateMemberRoleRequest,
+    authorization: str = Header(None)
+):
+    role = req.role.upper().strip()
+    if role not in ["ADMIN", "EDITOR", "VIEWER"]:
+        raise HTTPException(status_code=400, detail="Role must be ADMIN, EDITOR, or VIEWER.")
+    try:
+        eng = docweave_auth.get_engine()
+        with eng.begin() as conn:
+            conn.execute(
+                text("UPDATE workspace_members SET role = :r WHERE workspace_id::text = :ws AND id::text = :mid"),
+                {"r": role, "ws": workspace_id, "mid": member_id}
+            )
+        return {"status": "ok", "role": role}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 

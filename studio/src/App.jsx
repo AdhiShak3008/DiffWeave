@@ -12,6 +12,7 @@ import KnowledgeGraph from './components/KnowledgeGraph';
 import KnowledgeBase from './components/KnowledgeBase';
 import PolicyRulesLab from './components/PolicyRulesLab';
 import AuditLog from './components/AuditLog';
+import AccessManagementModal from './components/AccessManagementModal';
 import { RefreshCw, CheckCircle2, AlertCircle, Sparkles, GitBranch, ArrowLeft } from 'lucide-react';
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [dismissedEmptyStateFor, setDismissedEmptyStateFor] = useState(null);
+  const [showAccessModal, setShowAccessModal] = useState(false);
 
   // State data
   const [stats, setStats] = useState(null);
@@ -206,7 +208,7 @@ export default function App() {
   }, [authUser]);
 
   // Actions
-  const handleCreateWorkspace = async (name, desc) => {
+  const handleCreateWorkspace = async (name, desc, template = 'empty', visibility = 'private') => {
     const cleanName = (name || '').trim();
     if (!cleanName) {
       showToast('Workspace name cannot be empty', 'error');
@@ -220,11 +222,13 @@ export default function App() {
       return;
     }
     try {
-      const newWs = await api.createWorkspace(cleanName, desc);
+      const newWs = await api.createWorkspace(cleanName, desc, template, visibility);
       const wsItem = {
         ...newWs,
         name: newWs.name || cleanName,
         description: newWs.description || desc,
+        template: newWs.template || template,
+        visibility: newWs.visibility || visibility,
         d_count: 0,
         k_count: 0
       };
@@ -454,6 +458,7 @@ export default function App() {
         refreshing={refreshing}
         proposals={proposals}
         diff={diff}
+        onOpenAccessModal={() => setShowAccessModal(true)}
       />
 
       {/* Main Content Area */}
@@ -630,6 +635,19 @@ export default function App() {
             <span>{toast.message}</span>
           </div>
         </div>
+      )}
+
+      {/* Workspace Access & Collaborators Modal */}
+      {showAccessModal && currentWorkspace && (
+        <AccessManagementModal
+          workspace={currentWorkspace}
+          isOpen={showAccessModal}
+          onClose={() => setShowAccessModal(false)}
+          onWorkspaceUpdated={(updatedWs) => {
+            setCurrentWorkspace(updatedWs);
+            setWorkspaces((prev) => prev.map((w) => w.id === updatedWs.id ? updatedWs : w));
+          }}
+        />
       )}
     </div>
   );

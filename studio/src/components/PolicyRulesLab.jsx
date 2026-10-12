@@ -33,6 +33,18 @@ export default function PolicyRulesLab({ rules, currentWorkspace, onCreateRule, 
       condition = { min_confidence: parseFloat(conditionVal) || 0.85 };
     } else if (ruleType === 'REGEX_FORMAT') {
       condition = { pattern: conditionVal };
+    } else if (ruleType === 'PROVENANCE_MANDATORY') {
+      condition = { require_source: true, enforce_doc_id: true };
+    } else if (ruleType === 'PHI_PII_GUARD') {
+      condition = { block_ssn_mrn: true, block_patient_names: true };
+    } else if (ruleType === 'INDEMNITY_CAP_LINT') {
+      condition = { max_cap_multiplier: parseFloat(conditionVal) || 1.0 };
+    } else if (ruleType === 'JURISDICTION_WHITELIST') {
+      condition = { allowed: conditionVal ? conditionVal.split(',').map(s => s.trim()) : ['DE', 'NY', 'CA', 'UK'] };
+    } else if (ruleType === 'STATISTICAL_VALIDATION') {
+      condition = { p_value_max: parseFloat(conditionVal) || 0.05, require_confidence_interval: true };
+    } else if (ruleType === 'TIMELINE_CONSTRAINT') {
+      condition = { max_days: parseInt(conditionVal) || 365 };
     } else {
       condition = { field: conditionVal };
     }
@@ -204,24 +216,61 @@ export default function PolicyRulesLab({ rules, currentWorkspace, onCreateRule, 
                 <label className="block text-xs font-medium text-slate-400 mb-1">Rule Condition Type</label>
                 <select
                   value={ruleType}
-                  onChange={(e) => setRuleType(e.target.value)}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setRuleType(newType);
+                    if (newType === 'CONFIDENCE_THRESHOLD') setConditionVal('0.85');
+                    else if (newType === 'PROVENANCE_MANDATORY') setConditionVal('true');
+                    else if (newType === 'PHI_PII_GUARD') setConditionVal('true');
+                    else if (newType === 'INDEMNITY_CAP_LINT') setConditionVal('1.0');
+                    else if (newType === 'JURISDICTION_WHITELIST') setConditionVal('DE, NY, CA, UK');
+                    else if (newType === 'STATISTICAL_VALIDATION') setConditionVal('0.05');
+                    else if (newType === 'TIMELINE_CONSTRAINT') setConditionVal('365');
+                    else if (newType === 'REQUIRED_FIELD') setConditionVal('governing_law');
+                    else if (newType === 'REGEX_FORMAT') setConditionVal('^[A-Z0-9_-]+$');
+                  }}
                   className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 >
                   <option value="CONFIDENCE_THRESHOLD">Confidence Threshold Floor</option>
-                  <option value="REGEX_FORMAT">RegEx Format Validator</option>
+                  <option value="PROVENANCE_MANDATORY">Mandatory Provenance Citation</option>
+                  <option value="PHI_PII_GUARD">HIPAA / PII Redaction Guardrail</option>
+                  <option value="INDEMNITY_CAP_LINT">Indemnity Cap Multiplier Check</option>
+                  <option value="JURISDICTION_WHITELIST">Jurisdiction Whitelist Filter</option>
+                  <option value="STATISTICAL_VALIDATION">Statistical p-Value / Power Verification</option>
+                  <option value="TIMELINE_CONSTRAINT">Timeline & Expiry Window Check</option>
                   <option value="REQUIRED_FIELD">Required Field Presence</option>
+                  <option value="REGEX_FORMAT">RegEx Format Validator</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Threshold / Pattern Value</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">
+                  {ruleType === 'CONFIDENCE_THRESHOLD' && 'Minimum Confidence (0.00 - 1.00)'}
+                  {ruleType === 'PROVENANCE_MANDATORY' && 'Provenance Requirement'}
+                  {ruleType === 'PHI_PII_GUARD' && 'PII / PHI Redaction Filter'}
+                  {ruleType === 'INDEMNITY_CAP_LINT' && 'Maximum Cap Multiplier (e.g. 1.0x or 2.0x)'}
+                  {ruleType === 'JURISDICTION_WHITELIST' && 'Allowed Jurisdictions (Comma separated)'}
+                  {ruleType === 'STATISTICAL_VALIDATION' && 'Maximum Permitted p-value (e.g. 0.05)'}
+                  {ruleType === 'TIMELINE_CONSTRAINT' && 'Maximum Duration in Days (e.g. 365)'}
+                  {ruleType === 'REQUIRED_FIELD' && 'Required Attribute / Field Key'}
+                  {ruleType === 'REGEX_FORMAT' && 'Regular Expression Pattern'}
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. 0.85 or ^PROTOCOL-[A-Z0-9-]+$"
+                  disabled={ruleType === 'PROVENANCE_MANDATORY' || ruleType === 'PHI_PII_GUARD'}
+                  placeholder={
+                    ruleType === 'CONFIDENCE_THRESHOLD' ? '0.85' :
+                    ruleType === 'JURISDICTION_WHITELIST' ? 'DE, NY, CA, UK' :
+                    ruleType === 'INDEMNITY_CAP_LINT' ? '1.0' :
+                    ruleType === 'STATISTICAL_VALIDATION' ? '0.05' :
+                    ruleType === 'TIMELINE_CONSTRAINT' ? '365' :
+                    ruleType === 'REQUIRED_FIELD' ? 'governing_law' :
+                    'Enforced automatically'
+                  }
                   value={conditionVal}
                   onChange={(e) => setConditionVal(e.target.value)}
-                  className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-[#141B2D] border border-slate-700/80 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50"
                 />
               </div>
 

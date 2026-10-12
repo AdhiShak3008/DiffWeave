@@ -36,8 +36,20 @@ import {
   Server,
   Key,
   Sun,
-  Moon
+  Moon,
+  Scale,
+  Code2,
+  Users,
+  FolderPlus,
+  Building2,
+  HeartPulse,
+  FlaskConical,
+  Cpu,
+  Briefcase,
+  FileCheck2,
+  FileText
 } from 'lucide-react';
+import { PARENT_CATEGORIES, TEMPLATES_CATALOG, getTemplateMeta } from '../data/templates';
 
 const GRADIENTS = [
   'from-teal-600/90 via-cyan-700/80 to-blue-800/90',
@@ -95,12 +107,29 @@ export default function WorkspaceHub({
   // GitHub-style Create Workspace form state
   const [wsName, setWsName] = useState('');
   const [wsDesc, setWsDesc] = useState('');
-  const [wsVisibility, setWsVisibility] = useState('public');
-  const [starterTemplate, setStarterTemplate] = useState('empty');
+  const [wsVisibility, setWsVisibility] = useState('private');
+  const [starterTemplate, setStarterTemplate] = useState('title-insurance');
+  const [selectedParent, setSelectedParent] = useState('legal_title');
   const [suggestedName] = useState(() => {
     const suggestions = ['fuzzy-spork', 'neural-policy-v2', 'clinical-guidelines', 'rag-truth-matrix', 'legal-audit-2026'];
     return suggestions[Math.floor(Math.random() * suggestions.length)];
   });
+
+  const handleSelectChildTemplate = (tmplId) => {
+    setStarterTemplate(tmplId);
+    const tmpl = TEMPLATES_CATALOG[tmplId];
+    if (tmpl) {
+      if (tmpl.defaultVisibility) {
+        setWsVisibility(tmpl.defaultVisibility);
+      }
+      if (!wsName.trim() && tmpl.suggestedSlug) {
+        setWsName(tmpl.suggestedSlug);
+      }
+      if (!wsDesc.trim() && tmpl.description) {
+        setWsDesc(tmpl.description);
+      }
+    }
+  };
 
   const username = currentUser?.username || 'developer';
   const displayName = currentUser?.username || 'developer';
@@ -205,15 +234,9 @@ export default function WorkspaceHub({
       alert(`A workspace named "${finalName}" already exists. Workspace names must be unique.`);
       return;
     }
-    const templateDescriptions = {
-      clinical: 'Hospital clinical guidelines, diagnostic criteria, standard of care protocols & dosing safety thresholds.',
-      trials: 'Clinical trial endpoints, RECIST criteria, SAE adverse event reporting & participant inclusion protocols.',
-      pharma: 'Pharmaceutical IND/CMC documentation, drug release specifications & pharmacovigilance audit trails.',
-      legal: 'Enterprise legal agreements, vendor contracts, NDA obligations & regulatory compliance covenants.',
-      engineering: 'Engineering system architecture RFCs, microservice contracts & cloud security baselines.',
-    };
-    const finalDesc = wsDesc.trim() || templateDescriptions[starterTemplate] || 'DiffWeave verified knowledge repository.';
-    await onCreateWorkspace(finalName, finalDesc, starterTemplate);
+    const currentTmpl = TEMPLATES_CATALOG[starterTemplate] || TEMPLATES_CATALOG['empty'];
+    const finalDesc = wsDesc.trim() || currentTmpl.description || 'DiffWeave verified knowledge repository.';
+    await onCreateWorkspace(finalName, finalDesc, starterTemplate, wsVisibility);
     setWsName('');
     setWsDesc('');
     setShowCreateModal(false);
@@ -507,6 +530,23 @@ export default function WorkspaceHub({
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                             <span>Running</span>
                           </span>
+                          <span className={`flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold backdrop-blur-sm ${
+                            ws.visibility === 'public'
+                              ? 'bg-sky-500/20 text-sky-200 border border-sky-400/30'
+                              : 'bg-black/30 text-amber-300 border border-amber-400/30'
+                          }`}>
+                            {ws.visibility === 'public' ? (
+                              <Globe className="w-2.5 h-2.5" />
+                            ) : (
+                              <Lock className="w-2.5 h-2.5" />
+                            )}
+                            <span className="capitalize">{ws.visibility || 'Private'}</span>
+                          </span>
+                          {ws.template && ws.template !== 'empty' && (
+                            <span className="hidden sm:inline-block px-1.5 py-0.5 rounded-full text-[9px] font-mono bg-black/40 text-slate-200 border border-white/20">
+                              {TEMPLATES_CATALOG[ws.template]?.name || ws.template}
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center space-x-1.5">
@@ -960,28 +1000,171 @@ export default function WorkspaceHub({
                 </div>
               </div>
 
-              {/* STEP 2: Configuration */}
+              {/* STEP 2: Domain Archetype & Specialized Template (Hugging Face Style) */}
               <div className="space-y-4 pt-2 border-t border-[#30363D]">
-                <div className="flex items-center space-x-2 text-white font-bold text-sm">
-                  <span className="w-5 h-5 rounded-full bg-[#21262D] text-slate-300 font-mono text-xs flex items-center justify-center">2</span>
-                  <span>Configuration</span>
+                <div className="flex items-center justify-between text-white font-bold text-sm">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-5 h-5 rounded-full bg-[#21262D] text-slate-300 font-mono text-xs flex items-center justify-center">2</span>
+                    <span>1. Select Workspace Domain (Parent Archetype)</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono">Hugging Face 2-Tier Selector</span>
                 </div>
 
-                {/* Choose Visibility */}
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-300">Choose visibility *</label>
+                {/* TIER 1: Parent Domain Categories */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  {PARENT_CATEGORIES.map((cat) => {
+                    const isSelected = selectedParent === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedParent(cat.id);
+                          const firstChild = Object.values(TEMPLATES_CATALOG).find((c) => c.parentId === cat.id);
+                          if (firstChild) handleSelectChildTemplate(firstChild.id);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                          isSelected
+                            ? 'border-emerald-500 bg-emerald-500/10 shadow-sm shadow-emerald-500/20'
+                            : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:border-slate-600 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                            {cat.name}
+                          </span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                            {cat.badge}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 block leading-tight">
+                          {cat.tagline}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* TIER 2: Child Templates in Selected Parent Category */}
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-300">
+                      2. Choose a specialized template:
+                    </label>
+                    <span className="text-[10px] text-emerald-400 font-mono">
+                      Domain Quality Gates
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    {Object.values(TEMPLATES_CATALOG)
+                      .filter((tmpl) => tmpl.parentId === selectedParent)
+                      .map((tmpl) => {
+                        const isSelected = starterTemplate === tmpl.id;
+                        return (
+                          <button
+                            key={tmpl.id}
+                            type="button"
+                            onClick={() => handleSelectChildTemplate(tmpl.id)}
+                            className={`p-3 rounded-xl border text-left transition flex flex-col justify-between space-y-2 ${
+                              isSelected
+                                ? 'border-emerald-500 bg-emerald-500/10 shadow-sm shadow-emerald-500/10'
+                                : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:border-slate-600 hover:text-white'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between w-full gap-2">
+                              <div>
+                                <span className="font-bold text-slate-200 block text-xs">{tmpl.name}</span>
+                                <span className="text-[10px] text-slate-400 block pt-0.5 leading-snug">{tmpl.tagline}</span>
+                              </div>
+                              <span
+                                className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold shrink-0 ${
+                                  tmpl.defaultVisibility === 'private'
+                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                    : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+                                }`}
+                              >
+                                {tmpl.defaultVisibility === 'private' ? '🔒 Private' : '🌍 Public'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between w-full pt-1.5 border-t border-slate-800/80 text-[10px]">
+                              <span className="font-mono text-emerald-400 font-semibold">
+                                {tmpl.policyRules?.length || 2} Policy CI Rules
+                              </span>
+                              <span className="text-slate-500 font-mono">
+                                {(tmpl.recommendedFiles || []).join(', ')}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                {/* LIVE RULE INSPECTOR DRAWER */}
+                {TEMPLATES_CATALOG[starterTemplate] && (
+                  <div className="p-3.5 rounded-xl border border-slate-800 bg-[#0C101A] space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span className="text-xs font-bold text-white font-mono uppercase tracking-wider">
+                          Pre-Configured Policy as Code CI Suite:
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {TEMPLATES_CATALOG[starterTemplate].policyRules?.length} Active Guardrails
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px] font-mono">
+                      {(TEMPLATES_CATALOG[starterTemplate].policyRules || []).map((rule, idx) => (
+                        <div key={idx} className="flex items-start justify-between gap-2 p-1.5 rounded bg-[#121726] border border-slate-800/80">
+                          <div className="space-y-0.5">
+                            <span className="text-slate-200 font-semibold block">{rule.name}</span>
+                            <span className="text-slate-400 text-[10px] font-sans block">{rule.description}</span>
+                          </div>
+                          <span
+                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
+                              rule.is_blocking
+                                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}
+                          >
+                            {rule.is_blocking ? 'BLOCKING GATE' : 'ADVISORY'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: Choose Visibility with Smart Contextual Hint */}
+                <div className="space-y-2 pt-2 border-t border-[#30363D]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-300">Choose visibility *</label>
+                    <span className="text-[10px] text-slate-400">
+                      {TEMPLATES_CATALOG[starterTemplate]?.defaultVisibility === 'private'
+                        ? '🛡️ Recommended Private for confidential records'
+                        : '🌍 Recommended Public for open specifications'}
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label
                       onClick={() => setWsVisibility('public')}
                       className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition ${
                         wsVisibility === 'public'
-                          ? 'border-emerald-500 bg-emerald-500/10'
+                          ? 'border-sky-500 bg-sky-500/10 shadow-sm'
                           : 'border-[#30363D] bg-[#161B22] hover:border-slate-500'
                       }`}
                     >
-                      <Globe className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                      <Globe className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
                       <div>
-                        <span className="font-bold text-white block">Public</span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-bold text-white block">Public</span>
+                          {wsVisibility === 'public' && <span className="text-[9px] font-mono text-sky-300 font-bold">&check;</span>}
+                        </div>
                         <span className="text-[11px] text-slate-400">Anyone on DiffWeave can query verified truth from this workspace.</span>
                       </div>
                     </label>
@@ -990,103 +1173,19 @@ export default function WorkspaceHub({
                       onClick={() => setWsVisibility('private')}
                       className={`p-3 rounded-xl border flex items-start space-x-3 cursor-pointer transition ${
                         wsVisibility === 'private'
-                          ? 'border-emerald-500 bg-emerald-500/10'
+                          ? 'border-amber-500 bg-amber-500/10 shadow-sm'
                           : 'border-[#30363D] bg-[#161B22] hover:border-slate-500'
                       }`}
                     >
                       <Lock className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
                       <div>
-                        <span className="font-bold text-white block">Private</span>
-                        <span className="text-[11px] text-slate-400">You choose who can see and commit to this workspace.</span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-bold text-white block">Private</span>
+                          {wsVisibility === 'private' && <span className="text-[9px] font-mono text-amber-300 font-bold">&check;</span>}
+                        </div>
+                        <span className="text-[11px] text-slate-400">You choose who can see, query, and commit to this workspace.</span>
                       </div>
                     </label>
-                  </div>
-                </div>
-
-                {/* Starter Template */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-slate-300">Starter template</label>
-                    <span className="text-[10px] text-slate-500 font-mono">6 Specialized Templates</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setStarterTemplate('empty')}
-                      className={`p-2.5 rounded-lg border text-left transition ${
-                        starterTemplate === 'empty'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
-                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="font-bold block text-slate-200">Empty Workspace</span>
-                      <span className="text-[10px] text-slate-400 block pt-0.5">Blank slate, ingest docs via CLI or dropzone</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setStarterTemplate('clinical')}
-                      className={`p-2.5 rounded-lg border text-left transition ${
-                        starterTemplate === 'clinical'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
-                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="font-bold block text-emerald-400">General Clinical Protocols</span>
-                      <span className="text-[10px] text-slate-400 block pt-0.5">Hospital guidelines, diagnostic criteria & dosing thresholds</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setStarterTemplate('trials')}
-                      className={`p-2.5 rounded-lg border text-left transition ${
-                        starterTemplate === 'trials'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
-                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="font-bold block text-blue-400">Clinical Trials & Oncology</span>
-                      <span className="text-[10px] text-slate-400 block pt-0.5">Trial endpoints, RECIST criteria & SAE adverse event reporting</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setStarterTemplate('pharma')}
-                      className={`p-2.5 rounded-lg border text-left transition ${
-                        starterTemplate === 'pharma'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
-                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="font-bold block text-violet-400">Pharma & Drug Regulatory</span>
-                      <span className="text-[10px] text-slate-400 block pt-0.5">Pharmacovigilance, IND/CMC specs & regulatory submissions</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setStarterTemplate('legal')}
-                      className={`p-2.5 rounded-lg border text-left transition ${
-                        starterTemplate === 'legal'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
-                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="font-bold block text-amber-400">Legal Agreements</span>
-                      <span className="text-[10px] text-slate-400 block pt-0.5">NDAs, vendor contracts, clause extraction & policy CI rules</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setStarterTemplate('engineering')}
-                      className={`p-2.5 rounded-lg border text-left transition ${
-                        starterTemplate === 'engineering'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white shadow-sm'
-                          : 'border-[#30363D] bg-[#161B22] text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="font-bold block text-cyan-400">Engineering & DevOps RFCs</span>
-                      <span className="text-[10px] text-slate-400 block pt-0.5">System architecture RFCs, security baselines & API contracts</span>
-                    </button>
                   </div>
                 </div>
               </div>

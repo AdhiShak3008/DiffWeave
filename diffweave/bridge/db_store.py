@@ -284,8 +284,49 @@ def get_db_proposals(workspace_id: str, status: Optional[str] = None) -> list[di
         logger.warning(f"Error getting DB proposals: {e}")
         return []
 
+def seed_workspace_template_rules(workspace_id: str, template_id: str) -> list[dict[str, Any]]:
+    """Seed a newly created workspace with its specialized template policy rules."""
+    import json
+    import uuid
+    from diffweave.templates import get_template_policy_rules
+    rules = get_template_policy_rules(template_id)
+    eng = get_engine()
+    created = []
+    with eng.begin() as conn:
+        for r in rules:
+            rid = str(uuid.uuid4())
+            conn.execute(
+                text("""
+                    INSERT INTO rules (id, workspace_id, name, rule_type, configuration, enabled, description, created_at, updated_at)
+                    VALUES (:id, :ws, :name, :rt, :cfg, :enabled, :desc, NOW(), NOW())
+                """),
+                {
+                    "id": rid,
+                    "ws": workspace_id,
+                    "name": r["name"],
+                    "rt": r["rule_type"],
+                    "cfg": json.dumps(r.get("configuration", {})),
+                    "enabled": True,
+                    "desc": r.get("description", "Automated CI policy guardrail"),
+                }
+            )
+            created.append({
+                "id": rid,
+                "workspace_id": workspace_id,
+                "name": r["name"],
+                "rule_type": r["rule_type"],
+                "operator": r.get("operator", r["rule_type"]),
+                "configuration": r.get("configuration", {}),
+                "is_blocking": r.get("is_blocking", True),
+                "enabled": True,
+                "description": r.get("description", ""),
+                "created_at": "",
+            })
+    return created
+
 def get_db_rules(workspace_id: str) -> list[dict[str, Any]]:
     try:
+        from diffweave.templates import get_template_policy_rules
         eng = get_engine()
         with eng.connect() as conn:
             rows = conn.execute(
@@ -299,51 +340,27 @@ def get_db_rules(workspace_id: str) -> list[dict[str, Any]]:
             ).fetchall()
 
             if not rows:
+                # Find workspace template
+                tmpl_row = conn.execute(
+                    text("SELECT template FROM workspaces WHERE id::text = :ws"),
+                    {"ws": workspace_id}
+                ).first()
+                ws_template = tmpl_row[0] if tmpl_row and tmpl_row[0] else "empty"
+                template_rules = get_template_policy_rules(ws_template)
                 return [
                     {
-                        "id": "rule-confidence-floor",
+                        "id": r.get("id", f"rule-{i}"),
                         "workspace_id": workspace_id,
-                        "name": "Confidence Floor Check",
-                        "rule_type": "CONFIDENCE_THRESHOLD",
-                        "operator": "GTE",
-                        "configuration": {"min_confidence": 0.85},
+                        "name": r["name"],
+                        "rule_type": r["rule_type"],
+                        "operator": r.get("operator", r["rule_type"]),
+                        "configuration": r.get("configuration", {}),
+                        "is_blocking": r.get("is_blocking", True),
                         "enabled": True,
-                        "description": "Requires extraction confidence >= 85% before merge.",
-                        "created_at": "",
-                    },
-                    {
-                        "id": "rule-provenance-mandatory",
-                        "workspace_id": workspace_id,
-                        "name": "Mandatory Provenance Citation",
-                        "rule_type": "PROVENANCE_MANDATORY",
-                        "operator": "EXISTS",
-                        "configuration": {"require_source": True},
-                        "enabled": True,
-                        "description": "Blocks PRs lacking verifiable document section citations.",
-                        "created_at": "",
-                    },
-                    {
-                        "id": "rule-statistical-validation",
-                        "workspace_id": workspace_id,
-                        "name": "Statistical Claim Validation",
-                        "rule_type": "STATISTICAL_VALIDATION",
-                        "operator": "REGEX",
-                        "configuration": {"pattern": "p\\s*[<>=]\\s*0\\.\\d+"},
-                        "enabled": True,
-                        "description": "Verifies that quantitative clinical claims include p-value or confidence intervals.",
-                        "created_at": "",
-                    },
-                    {
-                        "id": "rule-adverse-escalation",
-                        "workspace_id": workspace_id,
-                        "name": "Safety Escalation Window (24h)",
-                        "rule_type": "TIMELINE_CONSTRAINT",
-                        "operator": "LTE",
-                        "configuration": {"max_hours": 24},
-                        "enabled": True,
-                        "description": "Enforces 24-hour reporting SLA for GCP safety violations.",
+                        "description": r.get("description", "Automated CI Policy Rule"),
                         "created_at": "",
                     }
+                    for i, r in enumerate(template_rules)
                 ]
 
             return [
@@ -353,7 +370,8 @@ def get_db_rules(workspace_id: str) -> list[dict[str, Any]]:
                     "name": r[1] or "Deterministic Rule",
                     "rule_type": r[2] or "PROVENANCE_MANDATORY",
                     "operator": r[2] or "PROVENANCE_MANDATORY",
-                    "configuration": r[3] or {},
+                    "configuration": r[3] if isinstance(r[3], dict) else {},
+                    "is_blocking": True,
                     "enabled": bool(r[4]),
                     "description": r[5] or "CI Policy verification rule",
                     "created_at": r[6].isoformat() if r[6] else "",
@@ -454,38 +472,158 @@ def get_db_semantic_diff(workspace_id: str) -> dict[str, Any]:
 
 def validate_db_proposals(workspace_id: str, proposal_id: Optional[str] = None) -> dict[str, Any]:
     try:
+        import re
         rules = get_db_rules(workspace_id)
         proposals = get_db_proposals(workspace_id)
+        pending = [p for p in proposals if p.get("status") == "PENDING" and (not proposal_id or p["id"] == proposal_id)]
+
+        validations = []
         violations = []
 
-        for p in proposals:
-            if proposal_id and p["id"] != proposal_id:
-                continue
-            # Rule 1: Provenance Check
-            evidence = p.get("proposed_changes", {}).get("evidence", [])
-            if not evidence and not p.get("rationale"):
-                violations.append({
-                    "rule": "PROVENANCE_MANDATORY",
-                    "proposal_id": p["id"],
-                    "summary": p["summary"],
-                    "severity": "BLOCKING",
-                    "reason": "Missing source citation or extraction rationale."
+        if not pending:
+            # If no pending proposals, evaluate workspace rules readiness in a dry-run suite
+            for r in rules:
+                r_name = r.get("name", "Policy Rule Gate")
+                r_type = r.get("rule_type", "CUSTOM")
+                validations.append({
+                    "proposal_id": "workspace-master",
+                    "summary": f"Workspace Policy Suite: {r_name}",
+                    "rule_name": r_name,
+                    "severity": "PASS",
+                    "message": f"Guardrail active and armed ({r_type}). No pending PR violations."
                 })
+            return {
+                "workspace_id": workspace_id,
+                "has_violations": False,
+                "violations_count": 0,
+                "violations": [],
+                "validations": validations,
+                "passed_rules": len(rules),
+                "checked_proposals": 0,
+                "status": "ALL_CHECKS_PASSED"
+            }
 
+        for p in pending:
+            pc = p.get("proposed_changes", {})
+            proposed_obj = pc.get("proposed", {}) if isinstance(pc, dict) else {}
+            text_corpus = f"{p.get('summary', '')} {p.get('rationale', '')} {str(proposed_obj)} {str(pc)}"
+
+            for r in rules:
+                if not r.get("enabled", True):
+                    continue
+
+                r_name = r.get("name", "Policy Rule Gate")
+                r_type = r.get("rule_type", "")
+                cfg = r.get("configuration", {}) if isinstance(r.get("configuration"), dict) else {}
+                is_blocking = r.get("is_blocking", True)
+                failed = False
+                fail_msg = ""
+
+                if r_type == "CONFIDENCE_THRESHOLD":
+                    min_conf = float(cfg.get("min_confidence", 0.85))
+                    conf = float(pc.get("confidence", proposed_obj.get("confidence", 0.90)))
+                    if conf < min_conf:
+                        failed = True
+                        fail_msg = f"Confidence {conf:.2f} is below required threshold {min_conf:.2f}"
+
+                elif r_type == "PROVENANCE_MANDATORY":
+                    evidence = pc.get("evidence", []) or proposed_obj.get("evidence", [])
+                    has_citation = bool(evidence or p.get("rationale") or "citation" in text_corpus.lower() or "source" in text_corpus.lower() or "section" in text_corpus.lower() or "page" in text_corpus.lower())
+                    pattern = cfg.get("pattern")
+                    if pattern:
+                        if not re.search(pattern, text_corpus, re.IGNORECASE):
+                            failed = True
+                            fail_msg = f"Missing mandatory provenance citation matching pattern '{pattern}'"
+                    elif not has_citation:
+                        failed = True
+                        fail_msg = "Missing verifiable document citation or extraction rationale."
+
+                elif r_type == "PHI_PII_GUARD":
+                    pattern = cfg.get("pattern", r"\b(?:\d{3}-\d{2}-\d{4}|MRN-\d{6,}|\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b)")
+                    if re.search(pattern, text_corpus, re.IGNORECASE):
+                        failed = True
+                        fail_msg = "Unredacted PHI/PII detected! Patient identifiers or SSNs must be removed before merge."
+
+                elif r_type == "STATISTICAL_VALIDATION":
+                    pattern = cfg.get("pattern", r"p\s*[<>=]\s*0\.\d+|\d+%\s*CI")
+                    if any(term in text_corpus.lower() for term in ["increase", "efficacy", "significant", "endpoint"]):
+                        if not re.search(pattern, text_corpus, re.IGNORECASE):
+                            failed = True
+                            fail_msg = "Quantitative clinical claim must cite p-value (e.g. p < 0.05) or 95% CI."
+
+                elif r_type == "TIMELINE_CONSTRAINT":
+                    max_hours = cfg.get("max_hours", 24)
+                    if "delayed" in text_corpus.lower() or "exceeded" in text_corpus.lower():
+                        failed = True
+                        fail_msg = f"Event escalation SLA exceeds authorized window of {max_hours} hours."
+
+                elif r_type == "INDEMNITY_CAP_LINT":
+                    if "unlimited" in text_corpus.lower() or "no cap" in text_corpus.lower():
+                        failed = True
+                        fail_msg = f"Indemnity liability cap exceeds allowable multiplier ({cfg.get('max_multiple', 2)}x ACV)."
+
+                elif r_type == "JURISDICTION_WHITELIST":
+                    allowed = [a.lower() for a in cfg.get("allowed", ["delaware", "new york"])]
+                    if "governing law" in text_corpus.lower() or "jurisdiction" in text_corpus.lower():
+                        if not any(a in text_corpus.lower() for a in allowed):
+                            failed = True
+                            fail_msg = f"Governing jurisdiction not in approved enterprise whitelist ({', '.join(cfg.get('allowed', []))})."
+
+                elif r_type == "REQUIRED_FIELD":
+                    field_name = cfg.get("field", "")
+                    if field_name and field_name not in pc and field_name not in proposed_obj:
+                        failed = True
+                        fail_msg = f"Mandatory document field '{field_name}' is missing from proposal payload."
+
+                elif r_type == "REGEX_FORMAT":
+                    pattern = cfg.get("pattern", "")
+                    if pattern and not re.search(pattern, text_corpus, re.IGNORECASE):
+                        failed = True
+                        fail_msg = f"Proposal content does not satisfy required regex format '{pattern}'."
+
+                if failed:
+                    violations.append({
+                        "rule": r_name,
+                        "proposal_id": p["id"],
+                        "summary": p["summary"],
+                        "severity": "BLOCKING" if is_blocking else "ADVISORY",
+                        "reason": fail_msg
+                    })
+                    validations.append({
+                        "proposal_id": p["id"],
+                        "summary": p["summary"],
+                        "rule_name": r_name,
+                        "severity": "FAIL",
+                        "message": fail_msg
+                    })
+                else:
+                    validations.append({
+                        "proposal_id": p["id"],
+                        "summary": p["summary"],
+                        "rule_name": r_name,
+                        "severity": "PASS",
+                        "message": f"Passed policy gate check for proposal '{p.get('summary', '')[:40]}'"
+                    })
+
+        violations_count = len([v for v in validations if v["severity"] == "FAIL"])
         return {
             "workspace_id": workspace_id,
-            "has_violations": len(violations) > 0,
+            "has_violations": violations_count > 0,
+            "violations_count": violations_count,
             "violations": violations,
-            "passed_rules": max(1, len(rules)),
-            "checked_proposals": len(proposals),
-            "status": "VIOLATIONS_DETECTED" if len(violations) > 0 else "ALL_CHECKS_PASSED"
+            "validations": validations,
+            "passed_rules": len([v for v in validations if v["severity"] == "PASS"]),
+            "checked_proposals": len(pending),
+            "status": "VIOLATIONS_DETECTED" if violations_count > 0 else "ALL_CHECKS_PASSED"
         }
     except Exception as e:
         logger.warning(f"Error in validate_db_proposals: {e}")
         return {
             "workspace_id": workspace_id,
             "has_violations": False,
+            "violations_count": 0,
             "violations": [],
+            "validations": [],
             "passed_rules": 1,
             "checked_proposals": 0,
             "status": "ALL_CHECKS_PASSED"

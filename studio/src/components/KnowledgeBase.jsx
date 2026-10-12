@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { api } from '../api/client.js';
+import { getTemplateMeta } from '../data/templates';
 
 export default function KnowledgeBase({
   knowledgeItems = [],
@@ -50,6 +51,19 @@ export default function KnowledgeBase({
   onApproveAll,
   onRefresh
 }) {
+  const templateConfig = getTemplateMeta(currentWorkspace?.template || currentWorkspace?.name);
+  const trConfig = templateConfig?.truthRegister || {
+    heading: 'ASK THE TRUTH REGISTER (GROUNDED RAG ASSISTANT)',
+    subheading: 'Query verified document facts with deterministic grounding and zero hallucination.',
+    placeholder: 'e.g. Search any verified fact, assertion, or document claim...',
+    suggestedQueries: [
+      'Summary of ingested document claims',
+      'Highest confidence verified assertions',
+      'Recent knowledge PR revisions',
+      'Provenance source document citations'
+    ]
+  };
+
   const [internalSearch, setInternalSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -426,8 +440,19 @@ if __name__ == "__main__":
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Ask the Truth Register (Grounded RAG Assistant)</h3>
-              <p className="text-[11px] text-slate-400">Test clinical questions directly against verified facts with zero hallucination.</p>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  {trConfig.heading || 'Ask the Truth Register (Grounded RAG Assistant)'}
+                </h3>
+                {templateConfig && (
+                  <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {templateConfig.name}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400">
+                {trConfig.subheading || 'Test domain questions directly against verified facts with zero hallucination.'}
+              </p>
             </div>
           </div>
 
@@ -450,7 +475,7 @@ if __name__ == "__main__":
               type="text"
               value={askQuery}
               onChange={(e) => setAskQuery(e.target.value)}
-              placeholder="e.g. What is the severe aortic stenosis mean gradient threshold?"
+              placeholder={trConfig.placeholder || 'e.g. Search any verified fact, assertion, or document claim...'}
               className="w-full bg-[#131927] border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
@@ -467,12 +492,7 @@ if __name__ == "__main__":
         {/* Quick Question Chips */}
         <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
           <span className="text-slate-500 text-[10px] uppercase font-mono">Suggested Queries:</span>
-          {[
-            'Aortic stenosis mean gradient threshold',
-            'SGLT2 inhibitors recommendation in heart failure',
-            'Standard DAPT duration for high bleeding risk',
-            'Adverse event safety escalation timeframe'
-          ].map((prompt) => (
+          {(trConfig.suggestedQueries || []).map((prompt) => (
             <button
               key={prompt}
               type="button"

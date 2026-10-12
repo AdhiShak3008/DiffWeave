@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DiffWeave Studio API Client
  * Talks directly to the FastAPI bridge, which delegates to DocWeave MCP Server.
  * Supports Bearer token authentication and user sessions.
@@ -142,11 +142,11 @@ export const api = {
     return res.json();
   },
 
-  async createWorkspace(name, description = '') {
+  async createWorkspace(name, description = '', template = 'empty', visibility = 'private') {
     const res = await fetch(`${API_BASE}/workspaces`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ name, description }),
+      body: JSON.stringify({ name, description, template, visibility }),
     });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
@@ -173,6 +173,54 @@ export const api = {
 
   async getWorkspaceStatus(workspaceId) {
     const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/status`, { headers: getHeaders() });
+    return res.json();
+  },
+
+  // -------------------------------------------------------------------------
+  // Access & Collaborators
+  // -------------------------------------------------------------------------
+  async getWorkspaceAccess(workspaceId) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/access`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async updateWorkspaceVisibility(workspaceId, visibility) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/access/visibility`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ visibility }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async addWorkspaceMember(workspaceId, email, role = 'EDITOR') {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/access/members`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ email, role }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async removeWorkspaceMember(workspaceId, memberId) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/access/members/${memberId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async updateWorkspaceMemberRole(workspaceId, memberId, role) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/access/members/${memberId}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
 

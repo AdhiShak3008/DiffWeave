@@ -17,16 +17,16 @@ from diffweave.cli.credentials import save_credentials, clear_credentials
 
 logger = logging.getLogger("diffweave.auth")
 
+from dotenv import load_dotenv
+load_dotenv()
+
 SECRET_KEY = os.environ.get(
     "SECRET_KEY",
-    "b1c482a537917a24274fa65e7c7fbe5dcce1e97a1e16c662dd470872e8f76fdf"
+    "diffweave-default-dev-secret-change-in-production"
 )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 525600  # 1 year for long-lived CLI & API access
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://neondb_owner:npg_LP1rgDY6JsTV@ep-morning-shadow-azegcix7-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
-)
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 FROM_EMAIL = os.environ.get("SMTP_FROM", "DocWeave <noreply@doc-weave.xyz>")
 
@@ -36,7 +36,13 @@ _engine = None
 def get_engine():
     global _engine
     if _engine is None:
-        _engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
+        db_url = os.environ.get("DATABASE_URL") or DATABASE_URL
+        if not db_url:
+            raise ValueError(
+                "DATABASE_URL environment variable is not configured. "
+                "Please configure DATABASE_URL in your .env file or environment."
+            )
+        _engine = create_engine(db_url, pool_pre_ping=True, pool_recycle=300)
     return _engine
 
 _otp_store: dict[str, dict] = {}
