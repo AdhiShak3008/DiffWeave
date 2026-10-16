@@ -248,6 +248,55 @@ export const api = {
     return res.json();
   },
 
+  async uploadBatchDocuments(workspaceId, files, batchName = '') {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    if (batchName) formData.append('batch_name', batchName);
+
+    const token = localStorage.getItem('diffweave_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/batch-upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async getWorkspaceBatches(workspaceId) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/batches`, { headers: getHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async getBatchDetails(workspaceId, batchId) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/batches/${batchId}`, { headers: getHeaders() });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async retryBatch(workspaceId, batchId) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/batches/${batchId}/retry`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async deleteBatch(workspaceId, batchId) {
+    const res = await fetch(`${API_BASE}/workspaces/${workspaceId}/batches/${batchId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+
   // -------------------------------------------------------------------------
   // Proposals & PRs
   // -------------------------------------------------------------------------
@@ -362,3 +411,6 @@ export const api = {
     return res.json();
   },
 };
+
+export default api;
+

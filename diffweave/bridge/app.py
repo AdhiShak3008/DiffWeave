@@ -12,15 +12,18 @@ import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import uuid
 import secrets
 from datetime import datetime
 from diffweave.cli.credentials import save_credentials, load_credentials, clear_credentials, get_credentials_file
 
 from diffweave.mcp.client import DiffWeaveMCPClient
 from diffweave.mcp.errors import MCPToolError, MCPConnectionError
+from diffweave.bridge.batch_manager import batch_manager
+from diffweave.bridge import redis_service
 
 app = FastAPI(
     title="DiffWeave Studio Bridge",
@@ -677,15 +680,22 @@ async def batch_delete_workspaces_endpoint(req: BatchDeleteWorkspacesRequest, au
 @app.get("/api/workspaces/{workspace_id}/status")
 async def get_workspace_status(workspace_id: str):
     try:
+        # Check Redis cache first (sub-millisecond latency)
+        cached = await redis_service.get_cached_workspace_status(workspace_id)
+        if cached:
+            return cached
+
         db_status = db_store.get_db_workspace_status(workspace_id)
         docs = db_store.get_db_documents(workspace_id)
         pending = db_store.get_db_proposals(workspace_id, status="PENDING")
-        return {
+        res = {
             "workspace_id": workspace_id,
             "stats": db_status,
             "documents": docs,
             "pending_proposals": pending,
         }
+        await redis_service.set_cached_workspace_status(workspace_id, res)
+        return res
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -742,12 +752,175 @@ async def delete_document_endpoint(document_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post("/api/documents/{document_id}/retry")
-async def retry_document_endpoint(document_id: str):
+
+# ---------------------------------------------------------------------------
+# Asynchronous Batch Document Processing
+# ---------------------------------------------------------------------------
+
+@app.post("/api/workspaces/{workspace_id}/batch-upload")
+async def batch_upload_endpoint(
+    workspace_id: str,
+    files: list[UploadFile] = File(...),
+    batch_name: Optional[str] = Form(None),
+    authorization: Optional[str] = Header(None),
+):
+    """
+    Accepts multiple documents in a single batch (heterogeneous or homogeneous kinds).
+    Saves them to temporary staging storage and triggers an asynchronous background
+    extraction & proposal pipeline.
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided in batch upload.")
+
+    user = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+        user = docweave_auth.get_current_user_from_token(token)
+
+    # Redis Sliding Window Rate Limiting (Prevents token exhaustion in public workspaces)
+    client_id = (user.get("id") if user else None) or "anonymous_uploader"
+    allowed, remaining = await redis_service.check_upload_rate_limit(client_id, max_uploads=25, window_seconds=900)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Batch upload rate limit exceeded on this workspace (25 batches / 15 mins). Please wait before staging new documents."
+        )
+
+    staged_files_data = []
+    batch_temp_dir = Path("storage/batches") / f"temp_{uuid.uuid4().hex[:12]}"
+    batch_temp_dir.mkdir(parents=True, exist_ok=True)
+
     try:
-        return await client.retry_document(document_id)
+        for f in files:
+            safe_filename = Path(f.filename).name
+            target_path = batch_temp_dir / safe_filename
+            with open(target_path, "wb") as out_f:
+                shutil.copyfileobj(f.file, out_f)
+
+            size_bytes = target_path.stat().st_size
+            sample_text = ""
+            try:
+                with open(target_path, "r", encoding="utf-8", errors="ignore") as tf:
+                    sample_text = tf.read(2048)
+            except Exception:
+                pass
+
+            staged_files_data.append({
+                "filename": safe_filename,
+                "file_path": str(target_path),
+                "size_bytes": size_bytes,
+                "content_sample": sample_text,
+            })
+
+        # Register batch job
+        batch_record = batch_manager.create_batch(
+            workspace_id=workspace_id,
+            files_data=staged_files_data,
+            batch_name=batch_name,
+            uploader=user,
+        )
+
+        # Dispatch background asynchronous processing pipeline
+        await batch_manager.start_batch_processing(batch_record["id"], mcp_client=client)
+
+        return {
+            "status": "ACCEPTED",
+            "message": f"Batch '{batch_record['name']}' accepted with {len(staged_files_data)} documents for asynchronous processing.",
+            "batch_id": batch_record["id"],
+            "workspace_id": workspace_id,
+            "total_files": batch_record["total_files"],
+            "batch": batch_record,
+        }
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error initiating batch upload: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/workspaces/{workspace_id}/batches")
+async def get_workspace_batches_endpoint(
+    workspace_id: str,
+    limit: int = Query(50),
+):
+    """List all batch processing jobs for a workspace with real-time status and metrics."""
+    try:
+        return batch_manager.list_batches(workspace_id, limit=limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/workspaces/{workspace_id}/batches/{batch_id}")
+async def get_batch_details_endpoint(
+    workspace_id: str,
+    batch_id: str,
+):
+    """Get granular per-file status, progress percentage, and live logs for a batch."""
+    b = batch_manager.get_batch(batch_id)
+    if not b or b.get("workspace_id") != workspace_id:
+        raise HTTPException(status_code=404, detail="Batch job not found.")
+    return b
+
+
+@app.post("/api/workspaces/{workspace_id}/batches/{batch_id}/retry")
+async def retry_batch_endpoint(
+    workspace_id: str,
+    batch_id: str,
+):
+    """Re-trigger failed documents in a batch asynchronously."""
+    b = await batch_manager.retry_batch(batch_id, mcp_client=client)
+    if not b:
+        raise HTTPException(status_code=404, detail="Batch job not found.")
+    return {"message": "Batch retry triggered", "batch": b}
+
+
+@app.delete("/api/workspaces/{workspace_id}/batches/{batch_id}")
+async def delete_batch_endpoint(
+    workspace_id: str,
+    batch_id: str,
+):
+    """Remove batch record from workspace history."""
+    success = batch_manager.delete_batch(batch_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Batch job not found.")
+    return {"message": "Batch removed from workspace history", "batch_id": batch_id}
+
+
+@app.get("/api/workspaces/{workspace_id}/stream")
+async def stream_workspace_events_endpoint(workspace_id: str):
+    """
+    Server-Sent Events (SSE) streaming endpoint powered by Redis Pub/Sub.
+    Clients receive instant, zero-polling live notifications for document ingestion,
+    cache hits, and batch completion.
+    """
+    async def event_generator():
+        yield "data: {\"event\": \"connected\", \"workspace_id\": \"%s\", \"timestamp\": \"%s\"}\n\n" % (
+            workspace_id, datetime.utcnow().strftime("%H:%M:%S")
+        )
+        async for event in redis_service.subscribe_workspace_events(workspace_id):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    from fastapi.responses import StreamingResponse
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.get("/api/redis/status")
+async def get_redis_health_endpoint():
+    """Returns live Redis connectivity status and caching capabilities."""
+    is_live = await redis_service.ping_redis()
+    return {
+        "redis_connected": is_live,
+        "mode": "DISTRIBUTED_REDIS" if is_live else "LOCAL_MEMORY_FALLBACK",
+        "features": {
+            "content_addressable_llm_caching": True,
+            "pub_sub_realtime_streaming": is_live,
+            "redlock_distributed_pr_mutex": is_live,
+            "workspace_status_caching": True,
+            "sliding_window_rate_limiting": is_live,
+        },
+        "description": "Content-addressable deduplication & distributed knowledge operations engine."
+    }
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -795,23 +968,38 @@ async def review_proposal_endpoint(
     req: ReviewProposalRequest,
 ):
     decision = req.decision.upper()
+    # Acquire Redis Distributed Mutex (Redlock pattern)
+    locked = await redis_service.acquire_proposal_lock(proposal_id, operator_name="reviewer")
+    if not locked:
+        raise HTTPException(
+            status_code=409,
+            detail="Conflict: This proposal is currently being reviewed or merged by another collaborator."
+        )
+
     try:
         # Fast direct DB review (sub-millisecond execution)
-        return db_store.review_db_proposal(workspace_id, proposal_id, decision, req.comments)
+        result = db_store.review_db_proposal(workspace_id, proposal_id, decision, req.comments)
+        await redis_service.invalidate_workspace_cache(workspace_id)
+        return result
     except Exception:
         try:
             if decision == "APPROVED":
-                return await client.approve_proposal(proposal_id, req.comments)
+                res = await client.approve_proposal(proposal_id, req.comments)
             elif decision == "REJECTED":
-                return await client.reject_proposal(proposal_id, req.comments)
+                res = await client.reject_proposal(proposal_id, req.comments)
             elif decision in ("ARCHIVED", "STASHED"):
-                return await client.archive_proposal(proposal_id, req.comments)
+                res = await client.archive_proposal(proposal_id, req.comments)
             elif decision == "RESTORE":
-                return await client.restore_proposal(proposal_id)
+                res = await client.restore_proposal(proposal_id)
             else:
                 raise HTTPException(status_code=400, detail=f"Unsupported decision '{decision}'.")
+            await redis_service.invalidate_workspace_cache(workspace_id)
+            return res
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        await redis_service.release_proposal_lock(proposal_id)
+
 
 
 @app.post("/api/workspaces/{workspace_id}/proposals/batch-review")

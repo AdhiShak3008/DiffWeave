@@ -159,7 +159,11 @@ def render_diff(diff_data: dict):
         existing = c.get("existing", {})
         proposed = c.get("proposed", {})
         evidence_list = proposed.get("evidence", [])
-        evidence_quote = evidence_list[0].get("quote", "N/A") if evidence_list else "None cited"
+        if evidence_list:
+            ev_item = evidence_list[0]
+            evidence_quote = ev_item.get("quote", str(ev_item)) if isinstance(ev_item, dict) else str(ev_item)
+        else:
+            evidence_quote = "None cited"
 
         body = (
             f"[bold red]COLLISION / CONTRADICTION DETECTED[/bold red]\n"
@@ -178,7 +182,11 @@ def render_diff(diff_data: dict):
     # 2. Additions
     for idx, a in enumerate(additions, 1):
         evidence_list = a.get("evidence", [])
-        evidence_quote = evidence_list[0].get("quote", "N/A") if evidence_list else "None cited"
+        if evidence_list:
+            ev_item = evidence_list[0]
+            evidence_quote = ev_item.get("quote", str(ev_item)) if isinstance(ev_item, dict) else str(ev_item)
+        else:
+            evidence_quote = "None cited"
         body = (
             f"[bold green]+ NEW {a.get('type', 'CLAIM')}:[/bold green] [bold white]{a.get('title')}[/bold white]\n"
             f"Value: \"{a.get('proposed_value')}\"\n"

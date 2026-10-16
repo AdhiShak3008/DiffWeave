@@ -408,6 +408,20 @@ export default function App() {
     }
   };
 
+  const handleUploadBatch = async (files, batchName) => {
+    try {
+      const res = await api.uploadBatchDocuments(currentWorkspace.id, files, batchName);
+      showToast(`Batch "${res.batch?.name || 'Batch'}" staged (${files.length} docs)!`);
+      setCurrentWorkspace((prev) => prev ? { ...prev, d_count: (prev.d_count || 0) + files.length } : prev);
+      refreshData();
+      return res;
+    } catch (err) {
+      showToast(`Batch upload failed: ${err.message}`, 'error');
+      throw err;
+    }
+  };
+
+
   const handleCreateRule = async (name, operator, condition, isBlocking) => {
     try {
       await api.createRule(currentWorkspace.id, name, operator, condition, isBlocking);
@@ -592,7 +606,9 @@ export default function App() {
                   <IngestionStaging
                     documents={documents}
                     onUploadDocument={handleUpload}
+                    onUploadBatch={handleUploadBatch}
                     currentWorkspace={currentWorkspace}
+                    currentUser={authUser}
                     loading={loading}
                     onSelectTab={handleTabChange}
                     onRefresh={refreshData}
